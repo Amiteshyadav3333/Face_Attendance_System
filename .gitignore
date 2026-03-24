@@ -1,0 +1,70 @@
+# ============================================
+# SENSITIVE FILES - KABHI COMMIT MAT KARO
+# ============================================
+
+# Environment variables
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# Firebase service account keys - saari JSON keys block
+serviceAccountKey.json
+*firebase-adminsdk*.json
+*-adminsdk-*.json
+
+# ============================================
+# PYTHON
+# ============================================
+
+# Virtual environment
+face_env/
+venv/
+env/
+.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# ============================================
+# NODE / REACT
+# ============================================
+
+node_modules/
+frontend/build/
+npm-debug.log*
+yarn-error.log*
+
+# ============================================
+# PROJECT SPECIFIC
+# ============================================
+
+# CSV exports (generated files)
+*.csv
+
+# Known face encodings (local data)
+known_faces/
+
+# Face images (local data)
+mkdir_faces/
+faces/
+
+# ============================================
+# OS FILES
+# ============================================
+
+.DS_Store
+Thumbs.db
+
+# ============================================
+# IDE
+# ============================================
+
+.vscode/
+.idea/
+*.swp

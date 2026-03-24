@@ -1,0 +1,61 @@
+body {
+    margin: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #121212;
+    color: #ffffff;
+  }
+  
+  .App {
+    text-align: center;
+    padding: 20px;
+  }
+  
+  h1 {
+    font-size: 2rem;
+    margin-bottom: 30px;
+    color: #00ffe0;
+  }
+  
+  button {
+    background-color: #00ffe0;
+    border: none;
+    padding: 12px 24px;
+    font-size: 16px;
+    color: #000000;
+    border-radius: 12px;
+    cursor: pointer;
+    margin: 10px;
+    transition: all 0.3s ease;
+  }
+  
+  button:hover {
+    background-color: #00bfa5;
+  }
+  
+  a {
+    display: inline-block;
+    margin-top: 10px;
+    color: #00ffe0;
+    text-decoration: none;
+    font-weight: bold;
+  }
+  
+  a:hover {
+    text-decoration: underline;
+  }
+  
+  p {
+    margin-top: 15px;
+    font-size: 18px;
+    color: #ccc;
+  }
+
+
+  /* Optional toast custom CSS */
+.Toastify__toast--success {
+    background-color: #1b5e20;
+  }
+  
+  .Toastify__toast--error {
+    background-color: #b71c1c;
+  }
