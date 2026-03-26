@@ -1,0 +1,34 @@
+.student-container { min-height: 100vh; background: #0f172a; color: #e2e8f0; font-family: 'Segoe UI', sans-serif; }
+.student-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 2rem; background: #1e293b; border-bottom: 1px solid #334155; }
+.student-header h1 { margin: 0; font-size: 1.5rem; }
+.header-right { display: flex; align-items: center; gap: 1rem; }
+.logout-btn { background: #ef4444; color: #fff; border: none; padding: 0.4rem 1rem; border-radius: 6px; cursor: pointer; }
+.loading { color: #fff; text-align: center; margin-top: 40vh; font-size: 1.2rem; }
+.profile-card { display: flex; flex-wrap: wrap; gap: 1rem; padding: 1.25rem 2rem; background: #1e293b; margin: 1.5rem 2rem 0; border-radius: 10px; border: 1px solid #334155; }
+.profile-item { display: flex; flex-direction: column; gap: 0.2rem; }
+.profile-item span { font-size: 0.78rem; color: #64748b; text-transform: uppercase; }
+.profile-item strong { font-size: 1rem; color: #f1f5f9; }
+.text-danger { color: #f87171 !important; }
+.text-success { color: #4ade80 !important; }
+.warning-banner { margin: 1rem 2rem; padding: 0.75rem 1.25rem; background: #dc262622; border: 1px solid #f87171; border-radius: 8px; color: #f87171; font-weight: 600; }
+.subjects-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.25rem; padding: 1.5rem 2rem; }
+.subject-card { background: #1e293b; border-radius: 12px; padding: 1.25rem; border: 1px solid #334155; }
+.subject-card.card-danger { border-color: #f8717155; }
+.subject-card.card-success { border-color: #4ade8055; }
+.subject-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; }
+.subject-card-header h3 { margin: 0; font-size: 1rem; color: #f1f5f9; }
+.teacher-name { font-size: 0.8rem; color: #64748b; }
+.attendance-stats { display: flex; justify-content: space-around; margin-bottom: 1rem; }
+.stat { display: flex; flex-direction: column; align-items: center; gap: 0.2rem; }
+.stat span { font-size: 0.75rem; color: #64748b; text-transform: uppercase; }
+.stat strong { font-size: 1.1rem; }
+.progress-bar-bg { position: relative; height: 10px; background: #334155; border-radius: 5px; margin-bottom: 0.25rem; overflow: visible; }
+.progress-bar-fill { height: 100%; border-radius: 5px; transition: width 0.4s ease; }
+.fill-success { background: #4ade80; }
+.fill-danger { background: #f87171; }
+.progress-marker { position: absolute; top: -4px; width: 2px; height: 18px; background: #fbbf24; border-radius: 2px; }
+.progress-labels { display: flex; justify-content: space-between; font-size: 0.72rem; color: #64748b; margin-bottom: 0.75rem; }
+.marker-label { color: #fbbf24; }
+.needed-classes { color: #f87171; font-size: 0.85rem; margin: 0.5rem 0 0; }
+.safe-text { color: #4ade80; font-size: 0.85rem; margin: 0.5rem 0 0; }
+.empty-msg { color: #64748b; padding: 2rem; text-align: center; }

@@ -1,0 +1,32 @@
+.admin-container { min-height: 100vh; background: #0f172a; color: #e2e8f0; font-family: 'Segoe UI', sans-serif; }
+.admin-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 2rem; background: #1e293b; border-bottom: 1px solid #334155; }
+.admin-header h1 { margin: 0; font-size: 1.5rem; color: #f8fafc; }
+.header-right { display: flex; align-items: center; gap: 1rem; }
+.logout-btn { background: #ef4444; color: #fff; border: none; padding: 0.4rem 1rem; border-radius: 6px; cursor: pointer; }
+.tabs { display: flex; gap: 0.5rem; padding: 1rem 2rem; background: #1e293b; border-bottom: 1px solid #334155; flex-wrap: wrap; }
+.tab-btn { padding: 0.5rem 1.2rem; border: 1px solid #475569; background: transparent; color: #94a3b8; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+.tab-btn.active { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+.tab-content { padding: 2rem; }
+.tab-content h2 { color: #f1f5f9; margin-bottom: 1rem; }
+.form-grid { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 2rem; align-items: flex-end; }
+.form-grid input, .form-grid select { padding: 0.5rem 0.75rem; background: #1e293b; border: 1px solid #475569; color: #e2e8f0; border-radius: 6px; min-width: 180px; }
+.btn-primary { background: #3b82f6; color: #fff; border: none; padding: 0.5rem 1.2rem; border-radius: 6px; cursor: pointer; }
+.btn-secondary { background: #475569; color: #fff; border: none; padding: 0.5rem 1.2rem; border-radius: 6px; cursor: pointer; }
+.btn-danger { background: #ef4444; color: #fff; border: none; padding: 0.3rem 0.8rem; border-radius: 5px; cursor: pointer; }
+.btn-export { background: #10b981; color: #fff; border: none; padding: 0.5rem 1.2rem; border-radius: 6px; cursor: pointer; }
+.data-table { width: 100%; border-collapse: collapse; background: #1e293b; border-radius: 8px; overflow: hidden; }
+.data-table th { background: #334155; padding: 0.75rem 1rem; text-align: left; color: #94a3b8; font-size: 0.85rem; text-transform: uppercase; }
+.data-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #334155; color: #e2e8f0; }
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr:hover td { background: #263148; }
+.role-badge { padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
+.role-badge.admin { background: #7c3aed22; color: #a78bfa; }
+.role-badge.teacher { background: #0891b222; color: #38bdf8; }
+.role-badge.student { background: #16a34a22; color: #4ade80; }
+.status-badge.present { color: #4ade80; }
+.status-badge.absent { color: #f87171; }
+.attendance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.modal-overlay { position: fixed; inset: 0; background: #00000088; display: flex; align-items: center; justify-content: center; z-index: 100; }
+.modal { background: #1e293b; padding: 2rem; border-radius: 12px; min-width: 360px; }
+.modal h3 { margin-bottom: 1rem; }
+.modal-actions { display: flex; gap: 0.75rem; }
