@@ -17,6 +17,7 @@ API.interceptors.request.use(async (config) => {
 
 // Auth
 export const verifyToken = (token) => API.post('/verify_token', { token });
+export const registerRole = (data) => API.post('/register_role', data);
 
 // Admin
 export const adminGetUsers = () => API.get('/admin/users');

@@ -1,0 +1,201 @@
+.rs-root {
+  min-height: 100vh;
+  background: #0a0f1e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  padding: 1rem;
+}
+
+.rs-card {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 520px;
+  overflow: hidden;
+  box-shadow: 0 24px 64px #00000060;
+}
+
+/* Header */
+.rs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.75rem;
+  border-bottom: 1px solid #1e293b;
+}
+.rs-logo { font-size: 1.1rem; font-weight: 700; color: #f8fafc; }
+.rs-logout {
+  background: transparent;
+  border: 1px solid #334155;
+  color: #94a3b8;
+  padding: 0.3rem 0.8rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  transition: all 0.15s;
+}
+.rs-logout:hover { border-color: #ef4444; color: #ef4444; }
+
+/* Email Badge */
+.rs-email-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.75rem;
+  background: #1e293b50;
+  border-bottom: 1px solid #1e293b;
+  font-size: 0.82rem;
+  color: #64748b;
+}
+.rs-email-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4ade80;
+  flex-shrink: 0;
+}
+
+/* Step */
+.rs-step { padding: 2rem 1.75rem; }
+.rs-step h2 { margin: 0 0 0.4rem; font-size: 1.3rem; color: #f1f5f9; font-weight: 700; }
+.rs-subtitle { margin: 0 0 1.75rem; font-size: 0.88rem; color: #64748b; }
+
+/* Role Grid */
+.rs-role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.rs-role-card {
+  background: #1e293b;
+  border: 2px solid #334155;
+  border-radius: 14px;
+  padding: 1.5rem 1.25rem;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.rs-role-card:hover { transform: translateY(-3px); box-shadow: 0 12px 32px #00000050; }
+.rs-role-card.teacher:hover { border-color: #3b82f6; background: #1d4ed810; }
+.rs-role-card.student:hover { border-color: #8b5cf6; background: #7c3aed10; }
+.rs-role-icon { font-size: 2rem; margin-bottom: 0.25rem; }
+.rs-role-card h3 { margin: 0; font-size: 1rem; color: #f1f5f9; font-weight: 700; }
+.rs-role-card p { margin: 0; font-size: 0.78rem; color: #64748b; line-height: 1.4; }
+.rs-role-arrow {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  color: #475569;
+  font-size: 1rem;
+  transition: all 0.2s;
+}
+.rs-role-card:hover .rs-role-arrow { color: #94a3b8; transform: translateX(3px); }
+
+/* Back */
+.rs-back {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  transition: color 0.15s;
+}
+.rs-back:hover { color: #94a3b8; }
+
+/* Role Pill */
+.rs-role-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.85rem;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+.rs-role-pill.teacher { background: #1d4ed820; color: #60a5fa; border: 1px solid #1d4ed840; }
+.rs-role-pill.student { background: #7c3aed20; color: #a78bfa; border: 1px solid #7c3aed40; }
+
+/* Form */
+.rs-form { display: flex; flex-direction: column; gap: 1.1rem; }
+.rs-field { display: flex; flex-direction: column; gap: 0.4rem; }
+.rs-field label { font-size: 0.82rem; color: #94a3b8; font-weight: 500; }
+.rs-field input {
+  padding: 0.7rem 1rem;
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #e2e8f0;
+  border-radius: 10px;
+  font-size: 0.92rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.rs-field input:focus { border-color: #3b82f6; }
+.rs-field input::placeholder { color: #475569; }
+
+/* Year Grid */
+.rs-year-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
+.rs-year-btn {
+  padding: 0.55rem;
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #94a3b8;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  transition: all 0.15s;
+}
+.rs-year-btn:hover { border-color: #475569; color: #e2e8f0; }
+.rs-year-btn.active { background: #1d4ed820; border-color: #3b82f6; color: #60a5fa; font-weight: 600; }
+
+/* Error */
+.rs-error {
+  background: #dc262618;
+  border: 1px solid #f8717130;
+  color: #f87171;
+  padding: 0.6rem 0.9rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+/* Submit */
+.rs-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+  border: none;
+  padding: 0.85rem;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition: opacity 0.15s;
+  margin-top: 0.25rem;
+}
+.rs-submit:hover { opacity: 0.9; }
+.rs-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+.rs-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #ffffff44;
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 480px) {
+  .rs-role-grid { grid-template-columns: 1fr; }
+  .rs-year-grid { grid-template-columns: repeat(2, 1fr); }
+}
