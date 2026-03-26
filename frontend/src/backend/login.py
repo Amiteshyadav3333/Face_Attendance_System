@@ -13,13 +13,40 @@ def verify_token():
     try:
         decoded = firebase_auth.verify_id_token(id_token)
         uid = decoded["uid"]
+        email = decoded.get("email", "")
+
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
         cursor.execute("SELECT id, role, email FROM users WHERE firebase_uid = %s", (uid,))
         user = cursor.fetchone()
-        conn.close()
+
+        # Agar koi bhi user DB mein nahi hai toh pehla user admin banega
         if not user:
-            return jsonify({"success": False, "message": "User not registered in system"}), 403
+            # Purana placeholder admin update karo ya naya insert karo
+            cursor.execute("SELECT id FROM users WHERE firebase_uid = 'ADMIN_FIREBASE_UID'")
+            placeholder = cursor.fetchone()
+            if placeholder:
+                cursor.execute(
+                    "UPDATE users SET firebase_uid=%s, email=%s WHERE firebase_uid='ADMIN_FIREBASE_UID'",
+                    (uid, email)
+                )
+                conn.commit()
+            else:
+                cursor.execute("SELECT COUNT(*) as count FROM users")
+                count = cursor.fetchone()["count"]
+                if count == 0:
+                    cursor.execute(
+                        "INSERT INTO users (firebase_uid, email, role) VALUES (%s, %s, 'admin')",
+                        (uid, email)
+                    )
+                    conn.commit()
+                else:
+                    conn.close()
+                    return jsonify({"success": False, "message": "User not registered. Contact admin."}), 403
+            cursor.execute("SELECT id, role, email FROM users WHERE firebase_uid = %s", (uid,))
+            user = cursor.fetchone()
+
+        conn.close()
         return jsonify({"success": True, "role": user["role"], "email": user["email"]}), 200
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 401
