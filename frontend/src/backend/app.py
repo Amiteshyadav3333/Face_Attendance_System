@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
 import os
@@ -23,6 +23,7 @@ from export_attendance import export_blueprint
 from recognize_face import recognize_blueprint
 
 app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024
 CORS(app, supports_credentials=True)
 
 app.register_blueprint(login_blueprint)
@@ -32,5 +33,18 @@ app.register_blueprint(student_blueprint)
 app.register_blueprint(export_blueprint)
 app.register_blueprint(recognize_blueprint)
 
+@app.get("/")
+@app.get("/health")
+def health():
+    return jsonify({"success": True, "service": "face-attendance-api"}), 200
+
+@app.errorhandler(413)
+def image_too_large(_error):
+    return jsonify({"success": False, "message": "Image is too large (maximum 8 MB)"}), 413
+
+@app.errorhandler(404)
+def not_found(_error):
+    return jsonify({"success": False, "message": "Endpoint not found"}), 404
+
 if __name__ == "__main__":
-    app.run(debug=True, port=5001)
+    app.run(debug=os.getenv("FLASK_DEBUG", "false").lower() == "true", port=5001)

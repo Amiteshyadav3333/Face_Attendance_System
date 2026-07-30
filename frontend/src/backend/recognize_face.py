@@ -4,15 +4,18 @@ import numpy as np
 import base64
 import cv2
 import os
+from auth_middleware import role_required
 
 recognize_blueprint = Blueprint('recognize_face', __name__)
 
 # Known faces folder se saari images load karo
-FACES_DIR = "/Users/amitesh/Face_Attendance_System/mkdir_faces"
+FACES_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "mkdir_faces"))
 
 def load_known_faces():
     known_encodings = []
     known_names = []
+    if not os.path.isdir(FACES_DIR):
+        return known_encodings, known_names
     for filename in os.listdir(FACES_DIR):
         if filename.lower().endswith((".jpg", ".jpeg", ".png")):
             name = os.path.splitext(filename)[0].title()
@@ -26,9 +29,10 @@ def load_known_faces():
 known_encodings, known_names = load_known_faces()
 
 @recognize_blueprint.route('/recognize_face', methods=['POST'])
+@role_required("teacher", "admin")
 def recognize_face():
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         image_data = data.get("image")
 
         if not image_data:
@@ -47,6 +51,8 @@ def recognize_face():
 
         if not face_encodings:
             return jsonify({"success": False, "message": "No face detected"}), 404
+        if not known_encodings:
+            return jsonify({"success": False, "message": "No registered faces found"}), 404
 
         for face_encoding in face_encodings:
             distances = face_recognition.face_distance(known_encodings, face_encoding)

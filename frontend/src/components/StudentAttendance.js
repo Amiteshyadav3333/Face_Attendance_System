@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { auth } from "../firebase";
 import { signOut } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { studentGetAttendance } from "../utils/api";
+import { studentGetLivenessChallenge, studentMarkByLiveness } from "../utils/api";
+import Webcam from "react-webcam";
 import "./StudentAttendance.css";
 
 const CircularProgress = ({ percentage, size = 80 }) => {
@@ -41,6 +43,10 @@ const StudentAttendance = ({ user }) => {
   const [attendance, setAttendance] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedSubject, setSelectedSubject] = useState(null);
+  const [livenessSubject, setLivenessSubject] = useState(null);
+  const [challenge, setChallenge] = useState(null);
+  const [livenessBusy, setLivenessBusy] = useState(false);
+  const webcamRef = useRef(null);
 
   useEffect(() => {
     studentGetAttendance()
@@ -73,6 +79,49 @@ const StudentAttendance = ({ user }) => {
   const getNeededClasses = (sub) => {
     if (!sub.total_classes) return 0;
     return Math.max(0, Math.ceil(0.75 * sub.total_classes) - (sub.attended_classes || 0));
+  };
+
+  const refreshAttendance = async () => {
+    const res = await studentGetAttendance();
+    setProfile(res.data.profile);
+    setAttendance(res.data.attendance);
+  };
+
+  const beginLiveness = async (subject) => {
+    setLivenessBusy(true);
+    try {
+      const res = await studentGetLivenessChallenge(subject.subject_id);
+      setLivenessSubject(subject);
+      setChallenge(res.data);
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Attendance session is not active");
+    } finally {
+      setLivenessBusy(false);
+    }
+  };
+
+  const captureLiveness = async () => {
+    if (!challenge || !livenessSubject) return;
+    setLivenessBusy(true);
+    const frames = [];
+    try {
+      for (let i = 0; i < 16; i += 1) {
+        await new Promise(resolve => setTimeout(resolve, 380));
+        const frame = webcamRef.current?.getScreenshot();
+        if (frame) frames.push(frame);
+      }
+      if (frames.length < 8) throw new Error("Camera did not capture enough live frames");
+      await studentMarkByLiveness(livenessSubject.subject_id, challenge.token, frames);
+      toast.success("✅ Live face verified. Attendance marked!");
+      setChallenge(null);
+      setLivenessSubject(null);
+      await refreshAttendance();
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || "Live verification failed");
+      setChallenge(null);
+    } finally {
+      setLivenessBusy(false);
+    }
   };
 
   if (loading) return (
@@ -249,6 +298,17 @@ const StudentAttendance = ({ user }) => {
                     </div>
                   )}
 
+                  {sub.active_session_id && (
+                    <button
+                      className="sa-tag blue"
+                      style={{ border: 0, padding: "10px 14px", cursor: "pointer", width: "100%", marginTop: 10 }}
+                      onClick={(e) => { e.stopPropagation(); beginLiveness(sub); }}
+                      disabled={livenessBusy}
+                    >
+                      📷 Mark My Attendance
+                    </button>
+                  )}
+
                   {/* Expanded Detail */}
                   {isSelected && (
                     <div className="sa-expanded-detail">
@@ -276,6 +336,33 @@ const StudentAttendance = ({ user }) => {
           </div>
         )}
       </div>
+      {livenessSubject && challenge && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 1000, background: "rgba(2,6,23,.9)",
+          display: "grid", placeItems: "center", padding: 20
+        }}>
+          <div style={{ width: "min(92vw,520px)", background: "#111827", borderRadius: 18, padding: 24, textAlign: "center" }}>
+            <h2>Live Attendance Check</h2>
+            <p style={{ color: "#fbbf24", fontSize: "1.1rem", fontWeight: 700 }}>{challenge.instruction}</p>
+            <p style={{ color: "#94a3b8" }}>Keep only your face visible. A photo, paused video, or single frame will be rejected.</p>
+            <Webcam
+              ref={webcamRef}
+              audio={false}
+              mirrored
+              screenshotFormat="image/jpeg"
+              screenshotQuality={0.82}
+              videoConstraints={{ facingMode: "user", width: 640, height: 480 }}
+              style={{ width: "100%", borderRadius: 14, margin: "12px 0" }}
+            />
+            <button onClick={captureLiveness} disabled={livenessBusy} className="sa-tag blue"
+              style={{ border: 0, padding: "12px 20px", cursor: "pointer", marginRight: 10 }}>
+              {livenessBusy ? "Checking live movement..." : "Start Blink Challenge"}
+            </button>
+            <button onClick={() => { setChallenge(null); setLivenessSubject(null); }} disabled={livenessBusy}
+              style={{ padding: "12px 20px", cursor: "pointer" }}>Cancel</button>
+          </div>
+        </div>
+      )}
       <ToastContainer position="top-right" autoClose={2500} theme="dark" />
     </div>
   );

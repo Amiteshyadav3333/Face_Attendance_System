@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { BrowserRouter as Router, Route, Routes, Navigate } from "react-router-dom";
 import { auth } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { verifyToken, registerRole } from "./utils/api";
+import { verifyToken } from "./utils/api";
 import Login from "./components/login";
 import AdminDashboard from "./components/AdminDashboard";
 import TeacherDashboard from "./components/TeacherDashboard";
@@ -13,50 +13,37 @@ import './APP.css';
 function App() {
   const [user, setUser] = useState(undefined);
   const [role, setRole] = useState(null);
-  const [pendingUid, setPendingUid] = useState(null);
   const [pendingEmail, setPendingEmail] = useState(null);
+  const [authError, setAuthError] = useState("");
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         try {
+          setAuthError("");
           const token = await currentUser.getIdToken();
           const res = await verifyToken(token);
           if (res.data.role === "pending") {
-            setPendingUid(res.data.uid);
             setPendingEmail(res.data.email);
             setRole("pending");
           } else {
             setRole(res.data.role);
             localStorage.setItem("role", res.data.role);
           }
-        } catch {
+        } catch (err) {
           setRole(null);
+          setAuthError(err.response?.data?.message || "Backend authentication failed. Please try again.");
         }
         setUser(currentUser);
       } else {
         setUser(null);
         setRole(null);
-        setPendingUid(null);
         setPendingEmail(null);
         localStorage.removeItem("role");
       }
     });
     return () => unsubscribe();
   }, []);
-
-  const handleRoleSelected = async (roleData) => {
-    try {
-      const token = await user.getIdToken();
-      await registerRole({ token, ...roleData });
-      setRole(roleData.role);
-      setPendingUid(null);
-      setPendingEmail(null);
-      localStorage.setItem("role", roleData.role);
-    } catch (err) {
-      alert(err.response?.data?.message || "Registration failed. Try again.");
-    }
-  };
 
   if (user === undefined) return (
     <div style={{
@@ -74,6 +61,16 @@ function App() {
     </div>
   );
 
+  if (user && authError) return (
+    <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#0a0f1e", color: "#e2e8f0" }}>
+      <div style={{ maxWidth: 460, padding: 32, borderRadius: 16, background: "#111827", textAlign: "center" }}>
+        <h2>Could not open your account</h2>
+        <p style={{ color: "#94a3b8" }}>{authError}</p>
+        <button onClick={() => window.location.reload()} style={{ padding: "10px 18px", cursor: "pointer" }}>Try Again</button>
+      </div>
+    </div>
+  );
+
   const getDashboard = () => {
     if (role === "admin") return <AdminDashboard user={user} />;
     if (role === "teacher") return <TeacherDashboard user={user} />;
@@ -81,7 +78,6 @@ function App() {
     if (role === "pending") return (
       <RoleSelection
         email={pendingEmail}
-        onRoleSelected={handleRoleSelected}
       />
     );
     return null;

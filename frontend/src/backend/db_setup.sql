@@ -55,6 +55,19 @@ CREATE TABLE IF NOT EXISTS attendance (
     FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
 );
 
+-- A teacher opens a short attendance window for one subject/class.
+CREATE TABLE IF NOT EXISTS attendance_sessions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    subject_id INT NOT NULL,
+    teacher_id INT NOT NULL,
+    opened_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATETIME NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
+    FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE CASCADE,
+    INDEX idx_active_subject (subject_id, is_active)
+);
+
 -- Default admin insert (firebase_uid baad mein update karo)
 INSERT IGNORE INTO users (firebase_uid, email, role) 
 VALUES ('ADMIN_FIREBASE_UID', 'admin@facesystem.com', 'admin');

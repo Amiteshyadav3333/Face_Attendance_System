@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { auth, googleProvider } from "../firebase";
 import {
   signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
   signInWithPopup,
 } from "firebase/auth";
 import { toast, ToastContainer } from "react-toastify";
@@ -13,8 +12,7 @@ import { FaEnvelope } from "react-icons/fa";
 import "./Login.css";
 
 const Login = () => {
-  const [isSignup, setIsSignup] = useState(false);
-  const [formData, setFormData] = useState({ email: "", password: "", confirmPassword: "" });
+  const [formData, setFormData] = useState({ email: "", password: "" });
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -28,20 +26,13 @@ const Login = () => {
 
   const handleEmailAuth = async (e) => {
     e.preventDefault();
-    const { email, password, confirmPassword } = formData;
+    const { email, password } = formData;
     if (!email || !password) { toast.error("Please fill all fields"); return; }
 
     try {
-      if (isSignup) {
-        if (password !== confirmPassword) { toast.error("Passwords do not match"); return; }
-        const res = await createUserWithEmailAndPassword(auth, email, password);
-        saveToken(res.user);
-        toast.success("Account created successfully!");
-      } else {
-        const res = await signInWithEmailAndPassword(auth, email, password);
-        saveToken(res.user);
-        toast.success("Login successful!");
-      }
+      const res = await signInWithEmailAndPassword(auth, email, password);
+      saveToken(res.user);
+      toast.success("Login successful!");
       setTimeout(() => navigate("/dashboard"), 1500);
     } catch (err) {
       toast.error(err.message.replace("Firebase: ", ""));
@@ -63,7 +54,7 @@ const Login = () => {
     <div className="login-page">
       <div className="login-container">
         <h2>🎓 Face Attendance System</h2>
-        <p className="login-subtitle">{isSignup ? "Create your account" : "Sign in to continue"}</p>
+        <p className="login-subtitle">Sign in to continue</p>
 
         <form onSubmit={handleEmailAuth} className="login-form">
           <input
@@ -80,18 +71,9 @@ const Login = () => {
             value={formData.password}
             onChange={handleChange}
           />
-          {isSignup && (
-            <input
-              type="password"
-              name="confirmPassword"
-              placeholder="Confirm Password"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-            />
-          )}
           <button type="submit" className="btn-email">
             <FaEnvelope style={{ marginRight: 8 }} />
-            {isSignup ? "Create Account" : "Login with Email"}
+            Login with Email
           </button>
         </form>
 
@@ -101,12 +83,7 @@ const Login = () => {
           <FcGoogle size={20} style={{ marginRight: 8 }} /> Continue with Google
         </button>
 
-        <p className="toggle-text">
-          {isSignup ? "Already have an account?" : "Don't have an account?"}
-          <span onClick={() => setIsSignup(!isSignup)}>
-            {isSignup ? " Login" : " Sign Up"}
-          </span>
-        </p>
+        <p className="toggle-text">Accounts are created by your administrator or teacher.</p>
       </div>
       <ToastContainer position="top-center" autoClose={2000} />
     </div>

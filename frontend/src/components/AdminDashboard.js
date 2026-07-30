@@ -7,8 +7,10 @@ import "react-toastify/dist/ReactToastify.css";
 import {
   adminGetUsers, adminCreateUser, adminDeleteUser,
   adminGetTeachers, adminGetStudents, adminUpdateStudent,
+  adminEnrollStudentFace,
+  adminUpdateTeacher, adminUpdateSubject,
   adminGetSubjects, adminCreateSubject, adminDeleteSubject,
-  adminGetAttendance, exportAttendance
+  adminGetAttendance, adminUpdateAttendance, exportAttendance
 } from "../utils/api";
 import "./AdminDashboard.css";
 
@@ -25,6 +27,9 @@ const AdminDashboard = ({ user }) => {
   const [newUser, setNewUser] = useState({ email: "", password: "", role: "teacher", name: "", department: "", roll_number: "", year: "1st" });
   const [newSubject, setNewSubject] = useState({ name: "", teacher_id: "", year: "1st" });
   const [editStudent, setEditStudent] = useState(null);
+  const [editTeacher, setEditTeacher] = useState(null);
+  const [editSubject, setEditSubject] = useState(null);
+  const [faceUploading, setFaceUploading] = useState(null);
 
   useEffect(() => { fetchTab(activeTab); }, [activeTab]);
 
@@ -97,6 +102,58 @@ const AdminDashboard = ({ user }) => {
     } catch { toast.error("Failed to update"); }
   };
 
+  const handleUpdateTeacher = async (e) => {
+    e.preventDefault();
+    try {
+      await adminUpdateTeacher(editTeacher.id, editTeacher);
+      toast.success("Teacher updated");
+      setEditTeacher(null);
+      fetchTab("Teachers");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to update teacher");
+    }
+  };
+
+  const handleUpdateSubject = async (e) => {
+    e.preventDefault();
+    try {
+      await adminUpdateSubject(editSubject.id, editSubject);
+      toast.success("Subject updated");
+      setEditSubject(null);
+      fetchTab("Subjects");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to update subject");
+    }
+  };
+
+  const handleFaceUpload = async (student, file) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("Image must be smaller than 8 MB");
+      return;
+    }
+    setFaceUploading(student.id);
+    try {
+      const image = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      await adminEnrollStudentFace(student.id, image);
+      toast.success(`Face registered for ${student.name}`);
+      fetchTab("Students");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Face registration failed");
+    } finally {
+      setFaceUploading(null);
+    }
+  };
+
   const handleExport = () => {
     exportAttendance().then((res) => {
       const url = window.URL.createObjectURL(new Blob([res.data], { type: "text/csv" }));
@@ -109,6 +166,16 @@ const AdminDashboard = ({ user }) => {
       window.URL.revokeObjectURL(url);
       toast.success("Exported!");
     }).catch(() => toast.error("Export failed"));
+  };
+
+  const handleAttendanceStatus = async (record, status) => {
+    try {
+      await adminUpdateAttendance(record.id, { date: record.date, status });
+      setAttendance(current => current.map(item => item.id === record.id ? { ...item, status } : item));
+      toast.success("Attendance updated");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Could not update attendance");
+    }
   };
 
   return (
@@ -178,9 +245,19 @@ const AdminDashboard = ({ user }) => {
         {/* TEACHERS TAB */}
         {activeTab === "Teachers" && (
           <div>
+            {editTeacher && (
+              <div className="modal-overlay"><div className="modal">
+                <h3>Edit Teacher</h3>
+                <form onSubmit={handleUpdateTeacher} className="form-grid">
+                  <input value={editTeacher.name} onChange={e => setEditTeacher({...editTeacher,name:e.target.value})} required />
+                  <input value={editTeacher.department || ""} onChange={e => setEditTeacher({...editTeacher,department:e.target.value})} placeholder="Department" />
+                  <div className="modal-actions"><button className="btn-primary">Save</button><button type="button" className="btn-secondary" onClick={() => setEditTeacher(null)}>Cancel</button></div>
+                </form>
+              </div></div>
+            )}
             <h2>All Teachers</h2>
             <table className="data-table">
-              <thead><tr><th>Name</th><th>Email</th><th>Department</th><th>Subjects</th></tr></thead>
+              <thead><tr><th>Name</th><th>Email</th><th>Department</th><th>Subjects</th><th>Action</th></tr></thead>
               <tbody>
                 {teachers.map(t => (
                   <tr key={t.id}>
@@ -188,6 +265,7 @@ const AdminDashboard = ({ user }) => {
                     <td>{t.email}</td>
                     <td>{t.department || "-"}</td>
                     <td>{t.subjects || "-"}</td>
+                    <td><button className="btn-secondary" onClick={() => setEditTeacher(t)}>Edit</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -218,7 +296,7 @@ const AdminDashboard = ({ user }) => {
             )}
             <h2>All Students</h2>
             <table className="data-table">
-              <thead><tr><th>Name</th><th>Roll No.</th><th>Year</th><th>Email</th><th>Action</th></tr></thead>
+              <thead><tr><th>Name</th><th>Roll No.</th><th>Year</th><th>Email</th><th>Face</th><th>Action</th></tr></thead>
               <tbody>
                 {students.map(s => (
                   <tr key={s.id}>
@@ -226,7 +304,24 @@ const AdminDashboard = ({ user }) => {
                     <td>{s.roll_number}</td>
                     <td>{s.year}</td>
                     <td>{s.email || "-"}</td>
-                    <td><button onClick={() => setEditStudent(s)} className="btn-secondary">Edit</button></td>
+                    <td>
+                      <span className={`status-badge ${s.face_registered ? "present" : "absent"}`}>
+                        {s.face_registered ? "Registered" : "Missing"}
+                      </span>
+                    </td>
+                    <td>
+                      <button onClick={() => setEditStudent(s)} className="btn-secondary">Edit</button>
+                      <label className="btn-primary" style={{ marginLeft: 8, display: "inline-block", cursor: "pointer" }}>
+                        {faceUploading === s.id ? "Uploading..." : s.face_registered ? "Replace Face" : "Add Face"}
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          disabled={faceUploading === s.id}
+                          onChange={e => handleFaceUpload(s, e.target.files?.[0])}
+                          style={{ display: "none" }}
+                        />
+                      </label>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -237,6 +332,21 @@ const AdminDashboard = ({ user }) => {
         {/* SUBJECTS TAB */}
         {activeTab === "Subjects" && (
           <div>
+            {editSubject && (
+              <div className="modal-overlay"><div className="modal">
+                <h3>Edit Subject</h3>
+                <form onSubmit={handleUpdateSubject} className="form-grid">
+                  <input value={editSubject.name} onChange={e => setEditSubject({...editSubject,name:e.target.value})} required />
+                  <select value={editSubject.teacher_id} onChange={e => setEditSubject({...editSubject,teacher_id:e.target.value})}>
+                    {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                  <select value={editSubject.year} onChange={e => setEditSubject({...editSubject,year:e.target.value})}>
+                    {["1st","2nd","3rd","4th"].map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                  <div className="modal-actions"><button className="btn-primary">Save</button><button type="button" className="btn-secondary" onClick={() => setEditSubject(null)}>Cancel</button></div>
+                </form>
+              </div></div>
+            )}
             <h2>Create Subject</h2>
             <form onSubmit={handleCreateSubject} className="form-grid">
               <input placeholder="Subject Name" value={newSubject.name} onChange={e => setNewSubject({ ...newSubject, name: e.target.value })} required />
@@ -260,7 +370,7 @@ const AdminDashboard = ({ user }) => {
                     <td>{s.teacher_name}</td>
                     <td>{s.year}</td>
                     <td>{s.total_classes}</td>
-                    <td><button onClick={() => handleDeleteSubject(s.id)} className="btn-danger">Delete</button></td>
+                    <td><button onClick={() => setEditSubject(s)} className="btn-secondary">Edit</button> <button onClick={() => handleDeleteSubject(s.id)} className="btn-danger">Delete</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -286,7 +396,12 @@ const AdminDashboard = ({ user }) => {
                     <td>{a.year}</td>
                     <td>{a.subject_name}</td>
                     <td>{a.teacher_name}</td>
-                    <td><span className={`status-badge ${a.status}`}>{a.status}</span></td>
+                    <td>
+                      <select value={a.status} onChange={e => handleAttendanceStatus(a, e.target.value)}>
+                        <option value="present">present</option>
+                        <option value="absent">absent</option>
+                      </select>
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -1,20 +1,19 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { auth } from "../firebase";
 import { signOut } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 import { toast, ToastContainer } from "react-toastify";
-import Webcam from "react-webcam";
 import "react-toastify/dist/ReactToastify.css";
 import {
   teacherGetProfile, teacherUpdateProfile,
   teacherGetSubjects, teacherGetSubjectAttendance,
-  teacherIncrementClasses, studentMarkByFace
+  teacherGetStudents, teacherCreateStudent, teacherEnrollStudentFace,
+  teacherStartSession, teacherEndSession, teacherExportAttendance
 } from "../utils/api";
 import "./TeacherDashboard.css";
 
 const TeacherDashboard = ({ user }) => {
   const navigate = useNavigate();
-  const webcamRef = useRef(null);
   const [profile, setProfile] = useState(null);
   const [editProfile, setEditProfile] = useState(false);
   const [subjects, setSubjects] = useState([]);
@@ -22,14 +21,19 @@ const TeacherDashboard = ({ user }) => {
   const [subjectData, setSubjectData] = useState(null);
   const [activeTab, setActiveTab] = useState("attendance");
   const [sessionOpen, setSessionOpen] = useState(false);
-  const [capturing, setCapturing] = useState(false);
-  const [lastDetected, setLastDetected] = useState(null);
+  const [students, setStudents] = useState([]);
+  const [newStudent, setNewStudent] = useState({
+    name: "", email: "", password: "", roll_number: "", year: "1st"
+  });
+  const [studentSaving, setStudentSaving] = useState(false);
+  const [faceUploading, setFaceUploading] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     teacherGetProfile().then(r => setProfile(r.data.profile)).catch(() => {});
     teacherGetSubjects().then(r => setSubjects(r.data.subjects)).catch(() => {});
+    teacherGetStudents().then(r => setStudents(r.data.students)).catch(() => {});
   }, []);
 
   const handleLogout = async () => {
@@ -49,7 +53,6 @@ const TeacherDashboard = ({ user }) => {
   const openSubject = async (subject) => {
     setActiveSubject(subject);
     setSessionOpen(false);
-    setLastDetected(null);
     setActiveTab("attendance");
     try {
       const res = await teacherGetSubjectAttendance(subject.id);
@@ -59,34 +62,75 @@ const TeacherDashboard = ({ user }) => {
 
   const startSession = async () => {
     try {
-      await teacherIncrementClasses(activeSubject.id);
+      await teacherStartSession(activeSubject.id, 10);
       setSessionOpen(true);
-      setLastDetected(null);
-      toast.success("Session started! Class count updated.");
+      toast.success("10-minute attendance session started.");
       const res = await teacherGetSubjectAttendance(activeSubject.id);
       setSubjectData(res.data);
     } catch { toast.error("Failed to start session"); }
   };
 
-  const handleCapture = useCallback(async () => {
-    if (!sessionOpen || !activeSubject) return;
-    const image = webcamRef.current?.getScreenshot();
-    if (!image) { toast.error("Camera not ready"); return; }
-    setCapturing(true);
+  const endSession = async () => {
+    if (!activeSubject) return;
     try {
-      const res = await studentMarkByFace(image, activeSubject.id);
-      const d = res.data;
-      setLastDetected(d);
-      toast.success(`✅ ${d.name} marked present`);
-      const updated = await teacherGetSubjectAttendance(activeSubject.id);
-      setSubjectData(updated.data);
+      await teacherEndSession(activeSubject.id);
+      setSessionOpen(false);
+      toast.success("Attendance session ended");
     } catch (err) {
-      toast.error(err.response?.data?.message || "Face not recognized");
-      setLastDetected(null);
-    } finally {
-      setCapturing(false);
+      toast.error(err.response?.data?.message || "Could not end session");
     }
-  }, [sessionOpen, activeSubject]);
+  };
+
+  const handleCreateStudent = async (e) => {
+    e.preventDefault();
+    setStudentSaving(true);
+    try {
+      await teacherCreateStudent(newStudent);
+      toast.success("Student account created");
+      setNewStudent({ name: "", email: "", password: "", roll_number: "", year: "1st" });
+      const res = await teacherGetStudents();
+      setStudents(res.data.students);
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Could not create student");
+    } finally {
+      setStudentSaving(false);
+    }
+  };
+
+  const handleFaceUpload = async (student, file) => {
+    if (!file) return;
+    setFaceUploading(student.id);
+    try {
+      const image = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      await teacherEnrollStudentFace(student.id, image);
+      toast.success(`Face registered for ${student.name}`);
+      const res = await teacherGetStudents();
+      setStudents(res.data.students);
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Face registration failed");
+    } finally {
+      setFaceUploading(null);
+    }
+  };
+
+  const handleExport = async () => {
+    try {
+      const res = await teacherExportAttendance();
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: "text/csv" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `my_attendance_${new Date().toISOString().slice(0, 10)}.csv`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Export failed");
+    }
+  };
 
   const filteredStudents = subjectData?.students?.filter(s =>
     s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -173,6 +217,11 @@ const TeacherDashboard = ({ user }) => {
             )}
           </div>
           <div className="td-topbar-right">
+            <button
+              className={`td-tab-pill ${activeTab === "students" ? "active" : ""}`}
+              onClick={() => setActiveTab("students")}
+            >🎓 Students</button>
+            <button onClick={handleExport} className="td-tab-pill">⬇ Export</button>
             <button
               className={`td-tab-pill ${activeTab === "attendance" ? "active" : ""}`}
               onClick={() => setActiveTab("attendance")}
@@ -273,80 +322,26 @@ const TeacherDashboard = ({ user }) => {
                   <div className="td-session-panel">
                     <div className="td-session-info">
                       <h3>Attendance Session</h3>
-                      <p>{sessionOpen ? "🟢 Session is active — scan student faces" : "Session is not started"}</p>
+                      <p>{sessionOpen ? "🟢 Session active — students can complete live verification on their phones" : "Session is not started"}</p>
                     </div>
                     {!sessionOpen ? (
                       <button className="td-btn-start" onClick={startSession}>
                         ▶ Start Session
                       </button>
                     ) : (
-                      <button className="td-btn-stop" onClick={() => { setSessionOpen(false); setLastDetected(null); }}>
+                      <button className="td-btn-stop" onClick={endSession}>
                         ⏹ End Session
                       </button>
                     )}
                   </div>
 
-                  {/* Webcam Section */}
+                  {/* Student self-verification notice */}
                   {sessionOpen && (
                     <div className="td-webcam-panel">
-                      <div className="td-webcam-left">
-                        <div className="td-webcam-wrapper">
-                          <Webcam
-                            ref={webcamRef}
-                            screenshotFormat="image/jpeg"
-                            width={400}
-                            height={300}
-                            className="td-webcam"
-                          />
-                          {capturing && <div className="td-scanning-overlay">🔍 Scanning...</div>}
-                        </div>
-                        <button onClick={handleCapture} disabled={capturing} className="td-btn-capture">
-                          {capturing ? (
-                            <><span className="td-spinner" /> Recognizing...</>
-                          ) : (
-                            <>📸 Capture & Mark Attendance</>
-                          )}
-                        </button>
-                      </div>
-
-                      <div className="td-webcam-right">
-                        {lastDetected ? (
-                          <div className={`td-result-card ${lastDetected.is_below_75 ? "danger" : "success"}`}>
-                            <div className="td-result-avatar">{getInitials(lastDetected.name)}</div>
-                            <h3>{lastDetected.name}</h3>
-                            <p className="td-result-roll">Roll: {lastDetected.roll_number}</p>
-                            <p className="td-result-year">{lastDetected.year} Year</p>
-                            <div className="td-result-stats">
-                              <div className="td-result-stat">
-                                <span>{lastDetected.attended_classes}</span>
-                                <label>Attended</label>
-                              </div>
-                              <div className="td-result-divider" />
-                              <div className="td-result-stat">
-                                <span>{lastDetected.total_classes}</span>
-                                <label>Total</label>
-                              </div>
-                              <div className="td-result-divider" />
-                              <div className="td-result-stat">
-                                <span className={lastDetected.is_below_75 ? "text-red" : "text-green"}>
-                                  {lastDetected.percentage}%
-                                </span>
-                                <label>Attendance</label>
-                              </div>
-                            </div>
-                            {lastDetected.is_below_75 && (
-                              <div className="td-result-warning">⚠️ Below 75% — Attendance shortage!</div>
-                            )}
-                            {!lastDetected.is_below_75 && (
-                              <div className="td-result-ok">✅ Attendance marked successfully</div>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="td-result-placeholder">
-                            <span>👤</span>
-                            <p>Student details will appear here after face scan</p>
-                          </div>
-                        )}
+                      <div className="td-result-placeholder">
+                        <span>🛡️</span>
+                        <h3>Live verification enabled</h3>
+                        <p>Each student must sign in personally, complete the random blink and head-turn challenge, and match their registered face.</p>
                       </div>
                     </div>
                   )}
@@ -424,6 +419,46 @@ const TeacherDashboard = ({ user }) => {
                 </>
               )}
             </>
+          )}
+
+          {activeTab === "students" && (
+            <div className="td-profile-page">
+              <div className="td-profile-card">
+                <h3>Add Student</h3>
+                <form onSubmit={handleCreateStudent} className="td-edit-form">
+                  <label>Name<input value={newStudent.name} onChange={e => setNewStudent({...newStudent, name:e.target.value})} required /></label>
+                  <label>Email<input type="email" value={newStudent.email} onChange={e => setNewStudent({...newStudent, email:e.target.value})} required /></label>
+                  <label>Temporary Password<input type="password" minLength="6" value={newStudent.password} onChange={e => setNewStudent({...newStudent, password:e.target.value})} required /></label>
+                  <label>Roll Number<input value={newStudent.roll_number} onChange={e => setNewStudent({...newStudent, roll_number:e.target.value})} required /></label>
+                  <label>Year
+                    <select value={newStudent.year} onChange={e => setNewStudent({...newStudent, year:e.target.value})}>
+                      {["1st","2nd","3rd","4th"].map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                  </label>
+                  <button className="td-btn-primary" disabled={studentSaving}>{studentSaving ? "Creating..." : "Create Student"}</button>
+                </form>
+              </div>
+              <div className="td-table-section">
+                <div className="td-table-header"><h3>My Students</h3></div>
+                <div className="td-table-wrapper">
+                  <table className="td-table">
+                    <thead><tr><th>Name</th><th>Roll</th><th>Year</th><th>Email</th><th>Face</th></tr></thead>
+                    <tbody>{students.map(s => (
+                      <tr key={s.id}>
+                        <td>{s.name}</td><td>{s.roll_number}</td><td>{s.year}</td><td>{s.email}</td>
+                        <td>
+                          <label className="td-btn-primary" style={{cursor:"pointer"}}>
+                            {faceUploading === s.id ? "Uploading..." : s.face_registered ? "Replace Face" : "Add Face"}
+                            <input type="file" accept="image/*" style={{display:"none"}} disabled={faceUploading === s.id}
+                              onChange={e => handleFaceUpload(s, e.target.files?.[0])} />
+                          </label>
+                        </td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </main>
