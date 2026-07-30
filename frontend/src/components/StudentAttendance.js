@@ -68,17 +68,25 @@ const StudentAttendance = ({ user }) => {
   };
 
   const overallPercent = attendance.length > 0
-    ? Math.round(attendance.reduce((sum, s) => sum + (s.percentage || 0), 0) / attendance.length)
+    ? Math.round(
+        attendance.filter(s => s.total_classes > 0).reduce((sum, s) => sum + (s.percentage || 0), 0) /
+        Math.max(1, attendance.filter(s => s.total_classes > 0).length)
+      )
     : 0;
 
-  const safeSubjects = attendance.filter(s => !s.is_below_75).length;
+  const safeSubjects = attendance.filter(s => s.total_classes > 0 && !s.is_below_75).length;
   const atRiskSubjects = attendance.filter(s => s.is_below_75).length;
 
   const getInitials = (name) => name ? name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) : "S";
 
   const getNeededClasses = (sub) => {
     if (!sub.total_classes) return 0;
-    return Math.max(0, Math.ceil(0.75 * sub.total_classes) - (sub.attended_classes || 0));
+    return Math.max(0, (3 * sub.total_classes) - (4 * (sub.attended_classes || 0)));
+  };
+
+  const getClassesCanMiss = (sub) => {
+    if (!sub.total_classes || sub.is_below_75) return 0;
+    return Math.max(0, Math.floor((sub.attended_classes || 0) / 0.75 - sub.total_classes));
   };
 
   const refreshAttendance = async () => {
@@ -286,7 +294,9 @@ const StudentAttendance = ({ user }) => {
                   </div>
 
                   {/* Status */}
-                  {sub.is_below_75 ? (
+                  {!sub.total_classes ? (
+                    <div className="sa-status-bar">No classes held yet</div>
+                  ) : sub.is_below_75 ? (
                     <div className="sa-status-bar danger">
                       {sub.total_classes > 0
                         ? `⚠️ Need ${needed} more class${needed !== 1 ? "es" : ""} to reach 75%`
@@ -319,7 +329,7 @@ const StudentAttendance = ({ user }) => {
                       <div className="sa-detail-row">
                         <span>Classes can miss (stay above 75%)</span>
                         <strong className="sa-safe-text">
-                          {sub.is_below_75 ? 0 : Math.floor(sub.attended_classes - 0.75 * sub.total_classes)}
+                          {getClassesCanMiss(sub)}
                         </strong>
                       </div>
                       <div className="sa-detail-row">

@@ -64,7 +64,7 @@ def get_my_attendance():
     conn.close()
 
     for subject in subjects:
-        subject["is_below_75"] = (subject["percentage"] or 0) < 75
+        subject["is_below_75"] = subject["total_classes"] > 0 and (subject["percentage"] or 0) < 75
         if subject["session_expires_at"]:
             subject["session_expires_at"] = subject["session_expires_at"].isoformat()
     profile = {

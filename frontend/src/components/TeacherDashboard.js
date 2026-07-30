@@ -36,6 +36,17 @@ const TeacherDashboard = ({ user }) => {
     teacherGetStudents().then(r => setStudents(r.data.students)).catch(() => {});
   }, []);
 
+  const availableYears = [...new Set(subjects.map(subject => subject.year))];
+
+  useEffect(() => {
+    const assignedYears = [...new Set(subjects.map(subject => subject.year))];
+    if (assignedYears.length) {
+      setNewStudent(current => assignedYears.includes(current.year)
+        ? current
+        : { ...current, year: assignedYears[0] });
+    }
+  }, [subjects]);
+
   const handleLogout = async () => {
     await signOut(auth);
     localStorage.clear();
@@ -425,14 +436,14 @@ const TeacherDashboard = ({ user }) => {
             <div className="td-profile-page">
               <div className="td-profile-card">
                 <h3>Add Student</h3>
-                <form onSubmit={handleCreateStudent} className="td-edit-form">
-                  <label>Name<input value={newStudent.name} onChange={e => setNewStudent({...newStudent, name:e.target.value})} required /></label>
-                  <label>Email<input type="email" value={newStudent.email} onChange={e => setNewStudent({...newStudent, email:e.target.value})} required /></label>
-                  <label>Temporary Password<input type="password" minLength="6" value={newStudent.password} onChange={e => setNewStudent({...newStudent, password:e.target.value})} required /></label>
+                <form onSubmit={handleCreateStudent} className="td-edit-form" autoComplete="off">
+                  <label>Name<input name="new-student-name" autoComplete="off" value={newStudent.name} onChange={e => setNewStudent({...newStudent, name:e.target.value})} required /></label>
+                  <label>Email<input name="new-student-email" autoComplete="off" type="email" value={newStudent.email} onChange={e => setNewStudent({...newStudent, email:e.target.value})} required /></label>
+                  <label>Temporary Password<input name="new-student-password" autoComplete="new-password" type="password" minLength="6" value={newStudent.password} onChange={e => setNewStudent({...newStudent, password:e.target.value})} required /></label>
                   <label>Roll Number<input value={newStudent.roll_number} onChange={e => setNewStudent({...newStudent, roll_number:e.target.value})} required /></label>
                   <label>Year
                     <select value={newStudent.year} onChange={e => setNewStudent({...newStudent, year:e.target.value})}>
-                      {["1st","2nd","3rd","4th"].map(y => <option key={y} value={y}>{y}</option>)}
+                      {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
                     </select>
                   </label>
                   <button className="td-btn-primary" disabled={studentSaving}>{studentSaving ? "Creating..." : "Create Student"}</button>

@@ -35,7 +35,14 @@ const Login = () => {
       toast.success("Login successful!");
       setTimeout(() => navigate("/dashboard"), 1500);
     } catch (err) {
-      toast.error(err.message.replace("Firebase: ", ""));
+      const friendlyErrors = {
+        "auth/invalid-credential": "Email or password is incorrect.",
+        "auth/user-not-found": "No account exists for this email.",
+        "auth/wrong-password": "Email or password is incorrect.",
+        "auth/too-many-requests": "Too many failed attempts. Please wait and try again.",
+        "auth/network-request-failed": "Network error. Check your internet connection."
+      };
+      toast.error(friendlyErrors[err.code] || "Login failed. Please try again.");
     }
   };
 
@@ -46,7 +53,9 @@ const Login = () => {
       toast.success("Logged in with Google!");
       setTimeout(() => navigate("/dashboard"), 1500);
     } catch (err) {
-      toast.error(err.message.replace("Firebase: ", ""));
+      toast.error(err.code === "auth/popup-closed-by-user"
+        ? "Google login was cancelled."
+        : "Google login failed. Please try again.");
     }
   };
 

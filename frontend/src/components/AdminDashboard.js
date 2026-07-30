@@ -202,10 +202,10 @@ const AdminDashboard = ({ user }) => {
         {activeTab === "Users" && (
           <div>
             <h2>Create New User</h2>
-            <form onSubmit={handleCreateUser} className="form-grid">
-              <input placeholder="Name" value={newUser.name} onChange={e => setNewUser({ ...newUser, name: e.target.value })} required />
-              <input placeholder="Email" type="email" value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} required />
-              <input placeholder="Password" type="password" value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} required />
+            <form onSubmit={handleCreateUser} className="form-grid" autoComplete="off">
+              <input name="new-user-name" autoComplete="off" placeholder="Name" value={newUser.name} onChange={e => setNewUser({ ...newUser, name: e.target.value })} required />
+              <input name="new-user-email" autoComplete="off" placeholder="Email" type="email" value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} required />
+              <input name="new-user-password" autoComplete="new-password" placeholder="Password" type="password" value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} required />
               <select value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value })}>
                 <option value="admin">Admin</option>
                 <option value="teacher">Teacher</option>
