@@ -10,10 +10,14 @@ import Webcam from "react-webcam";
 import "./StudentAttendance.css";
 
 const CircularProgress = ({ percentage, size = 80 }) => {
+  const numericPercentage = Number(percentage);
+  const safePercentage = Number.isFinite(numericPercentage)
+    ? Math.max(0, Math.min(numericPercentage, 100))
+    : 0;
   const radius = (size - 10) / 2;
   const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (Math.min(percentage, 100) / 100) * circumference;
-  const color = percentage >= 75 ? "#4ade80" : percentage >= 60 ? "#fbbf24" : "#f87171";
+  const offset = circumference - (safePercentage / 100) * circumference;
+  const color = safePercentage >= 75 ? "#4ade80" : safePercentage >= 60 ? "#fbbf24" : "#f87171";
 
   return (
     <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
@@ -31,7 +35,7 @@ const CircularProgress = ({ percentage, size = 80 }) => {
         textAnchor="middle" dominantBaseline="middle"
         style={{ transform: "rotate(90deg)", transformOrigin: "center", fill: color, fontSize: size < 70 ? "0.7rem" : "0.85rem", fontWeight: 700 }}
       >
-        {percentage}%
+        {Number.isInteger(safePercentage) ? safePercentage : safePercentage.toFixed(2)}%
       </text>
     </svg>
   );
@@ -46,13 +50,20 @@ const StudentAttendance = ({ user }) => {
   const [livenessSubject, setLivenessSubject] = useState(null);
   const [challenge, setChallenge] = useState(null);
   const [livenessBusy, setLivenessBusy] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [cameraError, setCameraError] = useState("");
   const webcamRef = useRef(null);
 
   useEffect(() => {
     studentGetAttendance()
       .then(res => {
         setProfile(res.data.profile);
-        setAttendance(res.data.attendance);
+        setAttendance(res.data.attendance.map(subject => ({
+          ...subject,
+          percentage: Number(subject.percentage) || 0,
+          attended_classes: Number(subject.attended_classes) || 0,
+          total_classes: Number(subject.total_classes) || 0
+        })));
         setLoading(false);
       })
       .catch(() => {
@@ -92,11 +103,26 @@ const StudentAttendance = ({ user }) => {
   const refreshAttendance = async () => {
     const res = await studentGetAttendance();
     setProfile(res.data.profile);
-    setAttendance(res.data.attendance);
+    setAttendance(res.data.attendance.map(subject => ({
+      ...subject,
+      percentage: Number(subject.percentage) || 0,
+      attended_classes: Number(subject.attended_classes) || 0,
+      total_classes: Number(subject.total_classes) || 0
+    })));
   };
 
   const beginLiveness = async (subject) => {
+    if (!window.isSecureContext) {
+      toast.error("Camera requires HTTPS. On this computer use http://localhost:3000; on a phone use an HTTPS deployment.");
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      toast.error("This browser does not support camera access. Use current Chrome, Edge, or Safari.");
+      return;
+    }
     setLivenessBusy(true);
+    setCameraReady(false);
+    setCameraError("");
     try {
       const res = await studentGetLivenessChallenge(subject.subject_id);
       setLivenessSubject(subject);
@@ -110,6 +136,10 @@ const StudentAttendance = ({ user }) => {
 
   const captureLiveness = async () => {
     if (!challenge || !livenessSubject) return;
+    if (!cameraReady) {
+      toast.error(cameraError || "Camera is not ready. Allow camera permission and try again.");
+      return;
+    }
     setLivenessBusy(true);
     const frames = [];
     try {
@@ -362,9 +392,24 @@ const StudentAttendance = ({ user }) => {
               screenshotFormat="image/jpeg"
               screenshotQuality={0.82}
               videoConstraints={{ facingMode: "user", width: 640, height: 480 }}
+              onUserMedia={() => {
+                setCameraReady(true);
+                setCameraError("");
+              }}
+              onUserMediaError={(error) => {
+                setCameraReady(false);
+                const name = error?.name || "";
+                setCameraError(name === "NotAllowedError"
+                  ? "Camera permission was denied. Allow camera access in browser settings."
+                  : name === "NotFoundError"
+                    ? "No camera was found on this device."
+                    : "Camera could not start. Close other camera apps and try again.");
+              }}
               style={{ width: "100%", borderRadius: 14, margin: "12px 0" }}
             />
-            <button onClick={captureLiveness} disabled={livenessBusy} className="sa-tag blue"
+            {cameraError && <p style={{ color: "#f87171", fontWeight: 700 }}>{cameraError}</p>}
+            {!cameraError && !cameraReady && <p style={{ color: "#94a3b8" }}>Starting camera… allow permission when asked.</p>}
+            <button onClick={captureLiveness} disabled={livenessBusy || !cameraReady} className="sa-tag blue"
               style={{ border: 0, padding: "12px 20px", cursor: "pointer", marginRight: 10 }}>
               {livenessBusy ? "Checking live movement..." : "Start Blink Challenge"}
             </button>
