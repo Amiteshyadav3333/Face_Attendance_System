@@ -13,6 +13,7 @@ import {
   adminGetAttendance, adminUpdateAttendance, exportAttendance
 } from "../utils/api";
 import "./AdminDashboard.css";
+import ProfileAvatar from "./ProfileAvatar";
 
 const TABS = ["Users", "Teachers", "Students", "Subjects", "Attendance"];
 
@@ -183,7 +184,8 @@ const AdminDashboard = ({ user }) => {
       <div className="admin-header">
         <h1>🛡️ Admin Dashboard</h1>
         <div className="header-right">
-          <span>👤 {user?.email}</span>
+          <ProfileAvatar name={user?.displayName || user?.email} className="admin-profile-avatar" />
+          <span>{user?.email}</span>
           <button onClick={handleLogout} className="logout-btn">Logout</button>
         </div>
       </div>
@@ -217,9 +219,7 @@ const AdminDashboard = ({ user }) => {
               {newUser.role === "student" && (
                 <>
                   <input placeholder="Roll Number" value={newUser.roll_number} onChange={e => setNewUser({ ...newUser, roll_number: e.target.value })} required />
-                  <select value={newUser.year} onChange={e => setNewUser({ ...newUser, year: e.target.value })}>
-                    {["1st","2nd","3rd","4th"].map(y => <option key={y} value={y}>{y} Year</option>)}
-                  </select>
+                  <input maxLength={50} placeholder="Year / semester / batch" value={newUser.year} onChange={e => setNewUser({ ...newUser, year: e.target.value })} required />
                 </>
               )}
               <button type="submit" className="btn-primary">Create User</button>
@@ -283,9 +283,7 @@ const AdminDashboard = ({ user }) => {
                   <form onSubmit={handleUpdateStudent} className="form-grid">
                     <input placeholder="Name" value={editStudent.name} onChange={e => setEditStudent({ ...editStudent, name: e.target.value })} required />
                     <input placeholder="Roll Number" value={editStudent.roll_number} onChange={e => setEditStudent({ ...editStudent, roll_number: e.target.value })} required />
-                    <select value={editStudent.year} onChange={e => setEditStudent({ ...editStudent, year: e.target.value })}>
-                      {["1st","2nd","3rd","4th"].map(y => <option key={y} value={y}>{y} Year</option>)}
-                    </select>
+                    <input maxLength={50} placeholder="Year / semester / batch" value={editStudent.year} onChange={e => setEditStudent({ ...editStudent, year: e.target.value })} required />
                     <div className="modal-actions">
                       <button type="submit" className="btn-primary">Save</button>
                       <button type="button" onClick={() => setEditStudent(null)} className="btn-secondary">Cancel</button>
@@ -340,9 +338,7 @@ const AdminDashboard = ({ user }) => {
                   <select value={editSubject.teacher_id} onChange={e => setEditSubject({...editSubject,teacher_id:e.target.value})}>
                     {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
-                  <select value={editSubject.year} onChange={e => setEditSubject({...editSubject,year:e.target.value})}>
-                    {["1st","2nd","3rd","4th"].map(y => <option key={y} value={y}>{y}</option>)}
-                  </select>
+                  <input maxLength={50} placeholder="Year / semester / batch" value={editSubject.year} onChange={e => setEditSubject({...editSubject,year:e.target.value})} required />
                   <div className="modal-actions"><button className="btn-primary">Save</button><button type="button" className="btn-secondary" onClick={() => setEditSubject(null)}>Cancel</button></div>
                 </form>
               </div></div>
@@ -354,9 +350,7 @@ const AdminDashboard = ({ user }) => {
                 <option value="">Select Teacher</option>
                 {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
-              <select value={newSubject.year} onChange={e => setNewSubject({ ...newSubject, year: e.target.value })}>
-                {["1st","2nd","3rd","4th"].map(y => <option key={y} value={y}>{y} Year</option>)}
-              </select>
+              <input maxLength={50} placeholder="Year / semester / batch" value={newSubject.year} onChange={e => setNewSubject({ ...newSubject, year: e.target.value })} required />
               <button type="submit" className="btn-primary">Create Subject</button>
             </form>
 

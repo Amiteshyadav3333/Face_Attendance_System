@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from db_connect import get_db_connection
 from auth_middleware import role_required
+from academic_years import normalize_academic_year
 from firebase_admin import auth as firebase_auth
 import base64
 import binascii
@@ -10,7 +11,6 @@ import numpy as np
 import face_recognition
 
 admin_blueprint = Blueprint("admin", __name__)
-VALID_YEARS = {"1st", "2nd", "3rd", "4th"}
 FACES_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "mkdir_faces"))
 
 # --- Users ---
@@ -57,11 +57,11 @@ def create_user():
             cursor.execute("INSERT INTO teachers (user_id, name, department) VALUES (%s, %s, %s)", (user_id, name, dept))
         elif role == "student":
             roll = data.get("roll_number")
-            year = data.get("year")
-            if not roll or year not in VALID_YEARS:
+            year = normalize_academic_year(data.get("year"))
+            if not roll or not year:
                 conn.rollback()
                 firebase_auth.delete_user(fb_user.uid)
-                return jsonify({"success": False, "message": "Valid roll_number and year required for student"}), 400
+                return jsonify({"success": False, "message": "Roll number and a year (up to 50 characters) are required for student"}), 400
             cursor.execute(
                 "INSERT INTO students (user_id, name, roll_number, year) VALUES (%s, %s, %s, %s)",
                 (user_id, name, roll, year)
@@ -127,9 +127,9 @@ def update_student(student_id):
     data = request.get_json(silent=True) or {}
     name = (data.get("name") or "").strip()
     roll_number = (data.get("roll_number") or "").strip()
-    year = data.get("year")
-    if not name or not roll_number or year not in VALID_YEARS:
-        return jsonify({"success": False, "message": "Valid name, roll number and year are required"}), 400
+    year = normalize_academic_year(data.get("year"))
+    if not name or not roll_number or not year:
+        return jsonify({"success": False, "message": "Name, roll number and a year (up to 50 characters) are required"}), 400
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -229,7 +229,14 @@ def get_subjects():
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     cursor.execute("""
-        SELECT sub.*, t.name as teacher_name
+        SELECT sub.id,sub.name,sub.teacher_id,sub.year,sub.total_classes,
+               TIME_FORMAT(sub.college_open_time,'%%H:%%i') AS college_open_time,
+               TIME_FORMAT(sub.college_close_time,'%%H:%%i') AS college_close_time,
+               TIME_FORMAT(sub.class_start_time,'%%H:%%i') AS class_start_time,
+               TIME_FORMAT(sub.class_end_time,'%%H:%%i') AS class_end_time,
+               sub.class_days,sub.current_topic,sub.next_topic,
+               DATE_FORMAT(sub.topic_updated_at,'%%Y-%%m-%%dT%%H:%%i:%%S') AS topic_updated_at,
+               t.name as teacher_name
         FROM subjects sub
         JOIN teachers t ON sub.teacher_id = t.id
     """)
@@ -243,9 +250,9 @@ def create_subject():
     data = request.get_json()
     name = data.get("name")
     teacher_id = data.get("teacher_id")
-    year = data.get("year")
-    if not all([name, teacher_id, year]):
-        return jsonify({"success": False, "message": "name, teacher_id, year required"}), 400
+    year = normalize_academic_year(data.get("year"))
+    if not name or not teacher_id or not year:
+        return jsonify({"success": False, "message": "Subject name, teacher, and a year (up to 50 characters) are required"}), 400
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("INSERT INTO subjects (name, teacher_id, year) VALUES (%s, %s, %s)", (name, teacher_id, year))
@@ -260,9 +267,9 @@ def update_subject(subject_id):
     data = request.get_json(silent=True) or {}
     name = (data.get("name") or "").strip()
     teacher_id = data.get("teacher_id")
-    year = data.get("year")
-    if not name or not teacher_id or year not in VALID_YEARS:
-        return jsonify({"success": False, "message": "Valid name, teacher and year are required"}), 400
+    year = normalize_academic_year(data.get("year"))
+    if not name or not teacher_id or not year:
+        return jsonify({"success": False, "message": "Subject name, teacher, and a year (up to 50 characters) are required"}), 400
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(

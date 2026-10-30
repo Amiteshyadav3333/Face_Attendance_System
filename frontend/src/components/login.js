@@ -53,9 +53,14 @@ const Login = () => {
       toast.success("Logged in with Google!");
       setTimeout(() => navigate("/dashboard"), 1500);
     } catch (err) {
-      toast.error(err.code === "auth/popup-closed-by-user"
-        ? "Google login was cancelled."
-        : "Google login failed. Please try again.");
+      const messages = {
+        "auth/popup-closed-by-user": "Google login was cancelled.",
+        "auth/unauthorized-domain": `This app domain (${window.location.hostname}) is not authorized in Firebase. Add it under Authentication → Settings → Authorized domains.`,
+        "auth/operation-not-allowed": "Google sign-in is disabled. Enable Google under Firebase Authentication → Sign-in method.",
+        "auth/popup-blocked": "The browser blocked the Google sign-in window. Allow popups for this site and retry.",
+        "auth/network-request-failed": "Could not reach Google sign-in. Check your internet connection."
+      };
+      toast.error(messages[err.code] || `Google login failed (${err.code || "unknown error"}). ${err.message || "Please retry."}`, { autoClose: 7000 });
     }
   };
 

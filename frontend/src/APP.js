@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { BrowserRouter as Router, Route, Routes, Navigate } from "react-router-dom";
+import { BrowserRouter as Router, Route, Routes, Navigate, useParams } from "react-router-dom";
 import { auth } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { verifyToken } from "./utils/api";
@@ -8,7 +8,13 @@ import AdminDashboard from "./components/AdminDashboard";
 import TeacherDashboard from "./components/TeacherDashboard";
 import StudentAttendance from "./components/StudentAttendance";
 import RoleSelection from "./components/RoleSelection";
+import { PublicProject } from "./components/ProjectHub";
 import './APP.css';
+
+function PublicProjectRoute() {
+  const { token } = useParams();
+  return <PublicProject token={token} />;
+}
 
 function App() {
   const [user, setUser] = useState(undefined);
@@ -86,6 +92,7 @@ function App() {
   return (
     <Router>
       <Routes>
+        <Route path="/projects/share/:token" element={<PublicProjectRoute />} />
         <Route path="/login" element={!user ? <Login /> : <Navigate to="/dashboard" />} />
         <Route path="/dashboard" element={user ? getDashboard() : <Navigate to="/login" />} />
         <Route path="/" element={<Navigate to={user ? "/dashboard" : "/login"} />} />

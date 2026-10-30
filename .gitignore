@@ -57,6 +57,7 @@ known_faces/
 # Face images (local data)
 mkdir_faces/
 faces/
+frontend/src/backend/uploads/
 
 # ============================================
 # OS FILES

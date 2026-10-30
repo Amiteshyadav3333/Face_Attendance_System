@@ -55,6 +55,21 @@ face recognition.
    mysql -u root -p < frontend/src/backend/db_setup.sql
    ```
 
+   Existing database ho to academic-year labels ke liye
+   `frontend/src/backend/db_migrate_academic_years.sql` ko MySQL administrator
+   account se run karo. MySQL Workbench mein SQL file open karke execute bhi kar
+   sakte ho. App ka restricted database account schema migrations run nahi kar sakta.
+   Classroom groups, polls, events, and file-chat ke liye uske baad
+   `frontend/src/backend/db_migrate_classroom_chat.sql` bhi administrator account
+   se execute karo; yeh purani one-to-one chat ko nayi conversation tables mein copy karta hai.
+   Teacher-assigned project groups, daily progress logs, scores, and public project
+   links ke liye `frontend/src/backend/db_migrate_projects.sql` bhi administrator
+   account se execute karo.
+   Student device issue ke waqt teacher ke manual attendance audit fields ke liye
+   `frontend/src/backend/db_migrate_manual_attendance.sql` execute karo.
+   Student dashboards ke campus hours, class timetable and teacher topic updates
+   ke liye `frontend/src/backend/db_migrate_subject_schedule.sql` execute karo.
+
 6. Run the backend:
    ```bash
    cd frontend/src/backend
@@ -79,14 +94,21 @@ face recognition.
 
 ## Important Notes
 
-- Public self-registration is disabled. Admins create teachers; teachers create
-  students for the academic years assigned to their subjects.
+- Public self-registration is disabled. Admins create teachers and subjects.
+  Admin subject banate waqt year, semester, ya batch label manually enter karta
+  hai (maximum 50 characters); teacher student create karte waqt wahi assigned
+  label manually enter karta hai. Labels fixed `1st`–`4th` list tak seemit nahi hain.
 - After creating a student, the teacher or admin registers a clear,
   front-facing image containing exactly one face.
 - Teachers select a subject and open a short attendance session.
 - Students sign in on their own device and complete a random multi-frame
   liveness challenge (blink plus head turn) before their registered face is
   matched. A still photo, paused clip, or single video frame is rejected.
+- Classroom chat supports teacher class channels, direct chats, student groups,
+  assignments with deadlines, polls, events, emoji, and common image/PDF/text/audio/video previews. Other file formats remain downloadable.
+- Project Studio lets teachers assign teams and daily milestones, students record
+  work/learning/technologies, teachers score submissions, and teams share a public
+  project showcase link. Groups are limited to 250 members.
 - Students can see subject-wise totals, percentages and shortage alerts.
 - Teachers can edit their profile and export only their own subjects'
   attendance. Admins can view/edit all teachers, students and subjects and

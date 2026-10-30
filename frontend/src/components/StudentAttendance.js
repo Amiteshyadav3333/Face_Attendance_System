@@ -4,9 +4,13 @@ import { signOut } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { studentGetAttendance } from "../utils/api";
+import { studentGetAttendance, studentEnrollMyFace } from "../utils/api";
 import { studentGetLivenessChallenge, studentMarkByLiveness } from "../utils/api";
 import Webcam from "react-webcam";
+import ChatHub from "./ChatHub";
+import ProjectHub from "./ProjectHub";
+import InterviewAgent from "./InterviewAgent";
+import ProfileAvatar from "./ProfileAvatar";
 import "./StudentAttendance.css";
 
 const CircularProgress = ({ percentage, size = 80 }) => {
@@ -52,6 +56,9 @@ const StudentAttendance = ({ user }) => {
   const [livenessBusy, setLivenessBusy] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState("");
+  const [captureStage, setCaptureStage] = useState("");
+  const [attendanceNotice, setAttendanceNotice] = useState("");
+  const [activeView, setActiveView] = useState("dashboard");
   const webcamRef = useRef(null);
 
   useEffect(() => {
@@ -88,8 +95,6 @@ const StudentAttendance = ({ user }) => {
   const safeSubjects = attendance.filter(s => s.total_classes > 0 && !s.is_below_75).length;
   const atRiskSubjects = attendance.filter(s => s.is_below_75).length;
 
-  const getInitials = (name) => name ? name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) : "S";
-
   const getNeededClasses = (sub) => {
     if (!sub.total_classes) return 0;
     return Math.max(0, (3 * sub.total_classes) - (4 * (sub.attended_classes || 0)));
@@ -112,6 +117,7 @@ const StudentAttendance = ({ user }) => {
   };
 
   const beginLiveness = async (subject) => {
+    setAttendanceNotice("");
     if (!window.isSecureContext) {
       toast.error("Camera requires HTTPS. On this computer use http://localhost:3000; on a phone use an HTTPS deployment.");
       return;
@@ -123,12 +129,46 @@ const StudentAttendance = ({ user }) => {
     setLivenessBusy(true);
     setCameraReady(false);
     setCameraError("");
+    setCaptureStage("");
+    setLivenessSubject(subject);
+    if (!profile?.face_registered) {
+      setChallenge({ enrollFace: true, instruction: "Look straight at the camera and keep one face clearly visible." });
+      setLivenessBusy(false);
+      return;
+    }
     try {
       const res = await studentGetLivenessChallenge(subject.subject_id);
       setLivenessSubject(subject);
       setChallenge(res.data);
     } catch (err) {
-      toast.error(err.response?.data?.message || "Attendance session is not active");
+      const message = err.response?.data?.message || "Attendance session is not active";
+      if (/face is not registered/i.test(message)) {
+        setChallenge({ enrollFace: true, instruction: "Look straight at the camera and keep one face clearly visible." });
+      } else {
+        setLivenessSubject(null);
+        toast.error(message);
+      }
+    } finally {
+      setLivenessBusy(false);
+    }
+  };
+
+  const captureFaceEnrollment = async () => {
+    if (!cameraReady || !webcamRef.current) {
+      toast.error(cameraError || "Camera is not ready yet.");
+      return;
+    }
+    setLivenessBusy(true);
+    try {
+      const image = webcamRef.current.getScreenshot();
+      if (!image) throw new Error("Could not capture a camera image. Try again.");
+      const response = await studentEnrollMyFace(image);
+      setProfile(current => ({ ...current, face_registered: true }));
+      setChallenge(null);
+      setLivenessSubject(null);
+      toast.success(response.data.message || "Face registered. Start attendance again for the live check.", { autoClose: 5000 });
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || "Face registration failed");
     } finally {
       setLivenessBusy(false);
     }
@@ -143,19 +183,34 @@ const StudentAttendance = ({ user }) => {
     setLivenessBusy(true);
     const frames = [];
     try {
-      for (let i = 0; i < 16; i += 1) {
-        await new Promise(resolve => setTimeout(resolve, 380));
+      for (let i = 0; i < 20; i += 1) {
+        if (i < 4) setCaptureStage("Look straight at the camera and keep your full face in frame.");
+        else if (i < 11) setCaptureStage(`Blink ${challenge.blink_count} time${challenge.blink_count === 1 ? "" : "s"} now.`);
+        else if (i < 17) setCaptureStage("Slowly turn your head to either side, then face the camera again.");
+        else setCaptureStage("Hold your face still while we verify your identity.");
+        await new Promise(resolve => setTimeout(resolve, 320));
         const frame = webcamRef.current?.getScreenshot();
         if (frame) frames.push(frame);
       }
+      setCaptureStage("Checking your face and attendance location…");
       if (frames.length < 8) throw new Error("Camera did not capture enough live frames");
-      await studentMarkByLiveness(livenessSubject.subject_id, challenge.token, frames);
-      toast.success("✅ Live face verified. Attendance marked!");
+      if (!navigator.geolocation) throw new Error("Location access is required for attendance");
+      const location = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(
+        p => resolve({ latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: p.coords.accuracy }),
+        () => reject(new Error("Could not verify your location. Allow location access and try again.")),
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      ));
+      const result = await studentMarkByLiveness(livenessSubject.subject_id, challenge.token, frames, location);
+      const confirmation = result.data.message || "Face recognized successfully. Your attendance is marked.";
+      setAttendanceNotice(`${confirmation} · ${livenessSubject.subject_name}`);
+      toast.success(`✅ ${confirmation}`, { autoClose: 5000 });
+      setCaptureStage("");
       setChallenge(null);
       setLivenessSubject(null);
       await refreshAttendance();
     } catch (err) {
       toast.error(err.response?.data?.message || err.message || "Live verification failed");
+      setCaptureStage("");
       setChallenge(null);
     } finally {
       setLivenessBusy(false);
@@ -177,11 +232,11 @@ const StudentAttendance = ({ user }) => {
           <div className="sa-logo">🎓 <span>EduAttend</span></div>
         </div>
         <div className="sa-header-center">
-          <h1>My Attendance</h1>
+          <h1>{activeView === "dashboard" ? "Student Dashboard" : activeView === "chat" ? "Classroom Chat" : activeView === "projects" ? "My Projects" : "Interview Agent"}</h1>
         </div>
         <div className="sa-header-right">
           <div className="sa-user-info">
-            <div className="sa-avatar">{getInitials(profile?.name)}</div>
+            <ProfileAvatar name={profile?.name} className="sa-avatar" />
             <div className="sa-user-text">
               <span className="sa-user-name">{profile?.name || user?.email}</span>
               <span className="sa-user-role">Student</span>
@@ -190,14 +245,28 @@ const StudentAttendance = ({ user }) => {
           <button onClick={handleLogout} className="sa-logout-btn">Logout</button>
         </div>
       </header>
+      <nav className="sa-view-nav" aria-label="Student dashboard sections">
+        <button className={activeView === "dashboard" ? "active" : ""} onClick={() => setActiveView("dashboard")}>▦ <span>Overview</span></button>
+        <button className={activeView === "chat" ? "active" : ""} onClick={() => setActiveView("chat")}>✉ <span>Chat</span></button>
+        <button className={activeView === "projects" ? "active" : ""} onClick={() => setActiveView("projects")}>🚀 <span>Projects</span></button>
+        <button className={activeView === "interview" ? "active" : ""} onClick={() => setActiveView("interview")}>🎙️ <span>Interview Agent</span></button>
+      </nav>
 
+      {activeView === "chat" ? (
+        profile?.id ? <div className="sa-tool-page"><ChatHub studentId={profile.id} role="student" /></div> : <div className="sa-empty"><p>Student profile is still loading.</p></div>
+      ) : activeView === "projects" ? (
+        <ProjectHub role="student" />
+      ) : activeView === "interview" ? (
+        <InterviewAgent />
+      ) : <>
+      {attendanceNotice && <div role="status" aria-live="polite" className="sa-attendance-notice">✅ {attendanceNotice}</div>}
       <div className="sa-body">
         {/* Profile + Summary Row */}
         <div className="sa-top-row">
           {/* Student Info Card */}
           {profile && (
             <div className="sa-info-card">
-              <div className="sa-info-avatar">{getInitials(profile.name)}</div>
+              <ProfileAvatar name={profile.name} className="sa-info-avatar" />
               <div className="sa-info-details">
                 <h2>{profile.name}</h2>
                 <div className="sa-info-tags">
@@ -289,11 +358,23 @@ const StudentAttendance = ({ user }) => {
                     </div>
                   </div>
 
+                  <div className="sa-class-info">
+                    {sub.college_open_time && sub.college_close_time ? <div className="sa-campus-hours"><span>🏫 Campus</span><strong>{sub.college_open_time} – {sub.college_close_time}</strong></div> : <div className="sa-campus-hours is-empty"><span>🏫 Campus hours</span><strong>Not published</strong></div>}
+                    {sub.class_start_time && sub.class_end_time ? <div className="sa-class-hours"><span>Class {sub.class_days ? `· ${sub.class_days}` : "time"}</span><strong>{sub.class_start_time} – {sub.class_end_time}</strong></div> : <div className="sa-class-hours is-empty"><span>Class schedule</span><strong>Not published</strong></div>}
+                    <div className="sa-topic-now"><span>📖 Teacher's topic</span><strong>{sub.current_topic || "Not updated yet"}</strong>{sub.topic_updated_at && <small>Updated {new Date(sub.topic_updated_at).toLocaleString()}</small>}</div>
+                    {sub.next_topic && <div className="sa-topic-next"><span>Up next</span><strong>{sub.next_topic}</strong></div>}
+                  </div>
+
                   {/* Stats Row */}
                   <div className="sa-card-stats">
                     <div className="sa-cs">
                       <span>{sub.attended_classes || 0}</span>
                       <label>Attended</label>
+                    </div>
+                    <div className="sa-cs-divider" />
+                    <div className="sa-cs">
+                      <span className={needed > 0 ? "sa-danger-text" : "sa-safe-text"}>{needed}</span>
+                      <label>Need for 75%</label>
                     </div>
                     <div className="sa-cs-divider" />
                     <div className="sa-cs">
@@ -376,15 +457,19 @@ const StudentAttendance = ({ user }) => {
           </div>
         )}
       </div>
+      </>}
       {livenessSubject && challenge && (
-        <div style={{
+        <div className="sa-camera-overlay" style={{
           position: "fixed", inset: 0, zIndex: 1000, background: "rgba(2,6,23,.9)",
           display: "grid", placeItems: "center", padding: 20
         }}>
-          <div style={{ width: "min(92vw,520px)", background: "#111827", borderRadius: 18, padding: 24, textAlign: "center" }}>
-            <h2>Live Attendance Check</h2>
+          <div className="sa-camera-modal" style={{ width: "min(92vw,520px)", background: "#111827", borderRadius: 18, padding: 24, textAlign: "center" }}>
+            <h2>{challenge.enrollFace ? "Register Your Face" : "Live Attendance Check"}</h2>
             <p style={{ color: "#fbbf24", fontSize: "1.1rem", fontWeight: 700 }}>{challenge.instruction}</p>
-            <p style={{ color: "#94a3b8" }}>Keep only your face visible. A photo, paused video, or single frame will be rejected.</p>
+            <div style={{textAlign:"left",background:"#0b1220",border:"1px solid #334155",borderRadius:12,padding:"12px 16px",color:"#cbd5e1"}}>
+              {challenge.enrollFace ? <p>First use: capture one clear face to register it. Then start attendance again for the live check.</p> : <ol style={{paddingLeft:22,margin:"4px 0"}}><li>Keep your full face visible.</li><li>Blink {challenge.blink_count} time{challenge.blink_count===1?"":"s"} when prompted.</li><li>Slowly turn your head to either side, then face forward.</li><li>Wait while your face and location are verified; attendance marks only after verification passes.</li></ol>}
+            </div>
+            {captureStage && <p role="status" aria-live="polite" style={{color:"#38bdf8",fontSize:"1.05rem",fontWeight:700,margin:"12px 0"}}>▶ {captureStage}</p>}
             <Webcam
               ref={webcamRef}
               audio={false}
@@ -409,11 +494,14 @@ const StudentAttendance = ({ user }) => {
             />
             {cameraError && <p style={{ color: "#f87171", fontWeight: 700 }}>{cameraError}</p>}
             {!cameraError && !cameraReady && <p style={{ color: "#94a3b8" }}>Starting camera… allow permission when asked.</p>}
-            <button onClick={captureLiveness} disabled={livenessBusy || !cameraReady} className="sa-tag blue"
+            {challenge.enrollFace ? <button onClick={captureFaceEnrollment} disabled={livenessBusy || !cameraReady} className="sa-tag blue"
+              style={{ border: 0, padding: "12px 20px", cursor: "pointer", marginRight: 10 }}>
+              {livenessBusy ? "Registering face..." : "Capture and Register Face"}
+            </button> : <button onClick={captureLiveness} disabled={livenessBusy || !cameraReady} className="sa-tag blue"
               style={{ border: 0, padding: "12px 20px", cursor: "pointer", marginRight: 10 }}>
               {livenessBusy ? "Checking live movement..." : "Start Blink Challenge"}
-            </button>
-            <button onClick={() => { setChallenge(null); setLivenessSubject(null); }} disabled={livenessBusy}
+            </button>}
+            <button onClick={() => { setChallenge(null); setLivenessSubject(null); setCaptureStage(""); }} disabled={livenessBusy}
               style={{ padding: "12px 20px", cursor: "pointer" }}>Cancel</button>
           </div>
         </div>
