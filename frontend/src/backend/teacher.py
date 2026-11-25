@@ -14,7 +14,7 @@ import numpy as np
 import face_recognition
 
 teacher_blueprint = Blueprint("teacher", __name__)
-FACES_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "mkdir_faces"))
+FACES_DIR = os.getenv("FACES_DIR") or os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "mkdir_faces"))
 
 def get_teacher_id(user_id):
     conn = get_db_connection()

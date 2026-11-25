@@ -10,7 +10,7 @@ from flask import Blueprint, jsonify, request, send_file
 from auth_middleware import role_required
 
 profile_blueprint = Blueprint("profile", __name__)
-PHOTO_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads", "profile_photos")
+PHOTO_DIR = os.getenv("PHOTO_DIR") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads", "profile_photos")
 
 
 @profile_blueprint.route("/profile/photo", methods=["GET"])

@@ -15,7 +15,7 @@ from liveness import analyze_liveness, create_challenge, read_challenge
 
 
 student_blueprint = Blueprint("student", __name__)
-FACES_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "mkdir_faces"))
+FACES_DIR = os.getenv("FACES_DIR") or os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "mkdir_faces"))
 
 
 def get_student(user_id):

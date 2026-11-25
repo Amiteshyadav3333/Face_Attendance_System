@@ -2,6 +2,7 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
 import os
+import json
 import firebase_admin
 from firebase_admin import credentials
 
@@ -11,8 +12,12 @@ load_dotenv(os.path.join(base_dir, ".env"), override=True)
 
 # Firebase Admin SDK initialize
 if not firebase_admin._apps:
-    key_file = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH", "serviceAccountKey.json")
-    cred = credentials.Certificate(os.path.join(base_dir, key_file))
+    service_account_json = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
+    if service_account_json:
+        cred = credentials.Certificate(json.loads(service_account_json))
+    else:
+        key_file = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH", "serviceAccountKey.json")
+        cred = credentials.Certificate(os.path.join(base_dir, key_file))
     firebase_admin.initialize_app(cred)
 
 from login import login_blueprint

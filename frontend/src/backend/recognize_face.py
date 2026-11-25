@@ -9,7 +9,7 @@ from auth_middleware import role_required
 recognize_blueprint = Blueprint('recognize_face', __name__)
 
 # Known faces folder se saari images load karo
-FACES_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "mkdir_faces"))
+FACES_DIR = os.getenv("FACES_DIR") or os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "mkdir_faces"))
 
 def load_known_faces():
     known_encodings = []
