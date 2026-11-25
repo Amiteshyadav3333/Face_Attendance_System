@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 COPY requirements.txt .
 RUN python -m venv /opt/venv \
-    && /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
+    && CMAKE_BUILD_PARALLEL_LEVEL=1 /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
 
 FROM python:3.11-slim-bookworm
 RUN apt-get update && apt-get install -y --no-install-recommends \
