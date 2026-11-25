@@ -1,3 +1,4 @@
+import { isAndroidApp } from '../utils/downloadReport';
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, googleProvider } from "../firebase";
@@ -91,11 +92,13 @@ const Login = () => {
           </button>
         </form>
 
-        <div className="divider"><span>OR</span></div>
+        {!isAndroidApp && (<>
+          <div className="divider"><span>OR</span></div>
 
-        <button className="btn-google" onClick={handleGoogleLogin}>
-          <FcGoogle size={20} style={{ marginRight: 8 }} /> Continue with Google
-        </button>
+          <button className="btn-google" onClick={handleGoogleLogin}>
+            <FcGoogle size={20} style={{ marginRight: 8 }} /> Continue with Google
+          </button>
+        </>)}
 
         <p className="toggle-text">Accounts are created by your administrator or teacher.</p>
       </div>

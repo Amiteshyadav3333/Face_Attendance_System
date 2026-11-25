@@ -1,3 +1,4 @@
+import { downloadReport, isAndroidApp } from '../utils/downloadReport';
 import React, { useState, useEffect } from "react";
 import { auth } from "../firebase";
 import { signOut } from "firebase/auth";
@@ -155,18 +156,15 @@ const AdminDashboard = ({ user }) => {
     }
   };
 
-  const handleExport = () => {
-    exportAttendance().then((res) => {
-      const url = window.URL.createObjectURL(new Blob([res.data], { type: "text/csv" }));
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `attendance_${new Date().toISOString().slice(0, 10)}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-      toast.success("Exported!");
-    }).catch(() => toast.error("Export failed"));
+  const handleExport = async () => {
+    try {
+      const response = await exportAttendance();
+      const date = new Date().toISOString().slice(0, 10);
+      await downloadReport(response.data, `attendance_${date}.csv`);
+      if (!isAndroidApp) toast.success("Exported!");
+    } catch {
+      toast.error("Export failed");
+    }
   };
 
   const handleAttendanceStatus = async (record, status) => {

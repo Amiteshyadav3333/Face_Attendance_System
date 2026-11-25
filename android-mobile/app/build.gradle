@@ -1,0 +1,37 @@
+plugins {
+    id 'com.android.application'
+}
+
+def configuredUrl = providers.gradleProperty('attendanceUrl').orNull
+if (configuredUrl != null) {
+    def url = new URI(configuredUrl)
+    if (url.scheme != 'https' || !url.host || url.userInfo || url.fragment || url.query) {
+        throw new GradleException('attendanceUrl must be an HTTPS URL for the attendance frontend.')
+    }
+}
+
+android {
+    namespace 'com.faceattendance'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'com.faceattendance.mobile'
+        minSdk 26
+        targetSdk 36
+        versionCode 1
+        versionName '1.0'
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    buildTypes {
+        debug {
+            buildConfigField 'String', 'ATTENDANCE_URL', '"' + (configuredUrl ?: 'http://localhost:3000/') + '"'
+        }
+        release {
+            buildConfigField 'String', 'ATTENDANCE_URL', '"' + (configuredUrl ?: '') + '"'
+        }
+    }
+}

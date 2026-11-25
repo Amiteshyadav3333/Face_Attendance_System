@@ -1,3 +1,4 @@
+import { downloadReport } from '../utils/downloadReport';
 import React, { useState, useEffect } from "react";
 import { auth } from "../firebase";
 import { signOut } from "firebase/auth";
@@ -229,13 +230,9 @@ const TeacherDashboard = ({ user }) => {
 
   const handleExport = async () => {
     try {
-      const res = await teacherExportAttendance();
-      const url = window.URL.createObjectURL(new Blob([res.data], { type: "text/csv" }));
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `my_attendance_${new Date().toISOString().slice(0, 10)}.csv`;
-      link.click();
-      window.URL.revokeObjectURL(url);
+      const response = await teacherExportAttendance();
+      const date = new Date().toISOString().slice(0, 10);
+      await downloadReport(response.data, `my_attendance_${date}.csv`);
     } catch {
       toast.error("Export failed");
     }
