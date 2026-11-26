@@ -8,11 +8,19 @@ _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(_BASE_DIR, ".env"), override=True)
 
 def get_db_connection():
-    conn = mysql.connector.connect(
+    tls_options = {}
+    ca_path = os.getenv("DB_SSL_CA")
+    if ca_path:
+        tls_options = {
+            "ssl_ca": ca_path,
+            "ssl_verify_cert": True,
+            "ssl_verify_identity": True,
+        }
+    return mysql.connector.connect(
         host=os.getenv("DB_HOST", "localhost"),
         port=int(os.getenv("DB_PORT", "3306")),
         user=os.getenv("DB_USER", "root"),
         password=os.getenv("DB_PASSWORD"),
-        database=os.getenv("DB_NAME", "attendance_system")
+        database=os.getenv("DB_NAME", "attendance_system"),
+        **tls_options,
     )
-    return conn
