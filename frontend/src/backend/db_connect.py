@@ -10,6 +10,7 @@ load_dotenv(os.path.join(_BASE_DIR, ".env"), override=True)
 def get_db_connection():
     conn = mysql.connector.connect(
         host=os.getenv("DB_HOST", "localhost"),
+        port=int(os.getenv("DB_PORT", "3306")),
         user=os.getenv("DB_USER", "root"),
         password=os.getenv("DB_PASSWORD"),
         database=os.getenv("DB_NAME", "attendance_system")
