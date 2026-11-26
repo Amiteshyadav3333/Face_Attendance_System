@@ -4,6 +4,7 @@ import io
 import json
 import os
 import urllib.error
+import urllib.parse
 import urllib.request
 
 from flask import Blueprint, jsonify, request
@@ -16,10 +17,14 @@ MAX_RESUME_TEXT = 14000
 MAX_TURNS = 8
 
 
+def _gemini_key():
+    return os.getenv("GEMINI_API_KEY", "").strip() or os.getenv("GOOGLE_API_KEY", "").strip()
+
+
 @interview_blueprint.route("/interview/status", methods=["GET"])
 @role_required("student")
 def interview_status():
-    return jsonify({"success": True, "configured": bool(os.getenv("OPENAI_API_KEY", "").strip())})
+    return jsonify({"success": True, "configured": bool(_gemini_key() or os.getenv("OPENAI_API_KEY", "").strip())})
 
 
 def _extract_resume(filename, encoded):
@@ -63,18 +68,46 @@ def read_resume():
 
 
 def _call_ai(messages):
-    api_key = os.getenv("OPENAI_API_KEY", "").strip()
-    if not api_key:
-        return None, ("Interview AI is not configured yet. Add OPENAI_API_KEY to the backend .env file and restart the server.", 503)
-    model = os.getenv("OPENAI_MODEL", "gpt-4.1-mini").strip()
-    payload = json.dumps({"model": model, "input": messages, "max_output_tokens": 500}).encode("utf-8")
+    gemini_key = _gemini_key()
+    if gemini_key:
+        model = os.getenv("GEMINI_MODEL", "").strip() or "gemini-3.5-flash-lite"
+        model = urllib.parse.quote(model.removeprefix("models/"), safe="")
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+        auth_headers = {"x-goog-api-key": gemini_key}
+        key_setting = "GEMINI_API_KEY"
+        body = {
+            "systemInstruction": {"parts": [{"text": messages[0]["content"]}]},
+            "contents": [
+                {
+                    "role": "model" if message["role"] == "assistant" else "user",
+                    "parts": [{"text": message["content"]}],
+                }
+                for message in messages[1:]
+            ],
+            "generationConfig": {"responseMimeType": "application/json", "maxOutputTokens": 2048},
+        }
+    else:
+        api_key = os.getenv("OPENAI_API_KEY", "").strip()
+        if not api_key:
+            return None, ("Interview AI is not configured. Add GEMINI_API_KEY to the backend environment.", 503)
+        model = os.getenv("OPENAI_MODEL", "").strip() or "gpt-4.1-mini"
+        url = "https://api.openai.com/v1/responses"
+        auth_headers = {"Authorization": f"Bearer {api_key}"}
+        key_setting = "OPENAI_API_KEY"
+        body = {"model": model, "input": messages, "max_output_tokens": 500}
+
     req = urllib.request.Request(
-        "https://api.openai.com/v1/responses", data=payload,
-        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}, method="POST"
+        url, data=json.dumps(body).encode("utf-8"),
+        headers={**auth_headers, "Content-Type": "application/json"}, method="POST"
     )
     try:
         with urllib.request.urlopen(req, timeout=35) as response:
             result = json.loads(response.read().decode("utf-8"))
+        if gemini_key:
+            candidates = result.get("candidates") or []
+            parts = candidates[0].get("content", {}).get("parts", []) if candidates else []
+            text = "".join(part.get("text", "") for part in parts if not part.get("thought"))
+            return text, None
         text = result.get("output_text", "")
         if not text:
             text = "\n".join(
@@ -86,10 +119,21 @@ def _call_ai(messages):
         return text, None
     except urllib.error.HTTPError as exc:
         if exc.code in (401, 403):
-            return None, ("The interview AI key was rejected. Check OPENAI_API_KEY in the backend .env file.", 503)
+            return None, (f"The interview AI key was rejected. Check {key_setting} in the backend environment.", 503)
+        if gemini_key and exc.code == 400:
+            try:
+                details = json.loads(exc.read()).get("error", {}).get("details", [])
+            except (ValueError, AttributeError):
+                details = []
+            if any(isinstance(detail, dict) and detail.get("reason") == "API_KEY_INVALID" for detail in details):
+                return None, ("The Gemini API key is invalid. Check GEMINI_API_KEY in the backend environment.", 503)
+        if gemini_key and exc.code == 404:
+            return None, ("The Gemini model is unavailable. Check GEMINI_MODEL in the backend environment.", 503)
         if exc.code == 429:
             return None, ("The interview service is busy or its usage limit was reached. Try again shortly.", 503)
         return None, ("The interview service could not respond. Please try again.", 502)
+    except (ValueError, AttributeError, TypeError):
+        return None, ("The interview service returned an invalid response. Please try again.", 502)
     except (urllib.error.URLError, TimeoutError):
         return None, ("Could not reach the interview service. Check the server connection and try again.", 502)
 

@@ -149,7 +149,7 @@ const InterviewAgent = () => {
       {!question && !result && <form className="interview-setup" onSubmit={startInterview}>
         <div className="interview-section-title"><span>01</span><div><h3>Set up your practice</h3><p>Choose a focus area and get questions tailored to you.</p></div></div>
         {backendError && <div className="interview-error" role="alert">{backendError}</div>}
-        {aiConfigured === false && <div className="interview-error" role="status">Interview AI setup is incomplete. Ask your app administrator to add OPENAI_API_KEY to the backend configuration and restart the server.</div>}
+        {aiConfigured === false && <div className="interview-error" role="status">Interview AI is not configured. Ask your administrator to check the backend AI settings.</div>}
         <label className="interview-label">What topic should we interview you on?<input value={topic} onChange={e => setTopic(e.target.value)} placeholder="e.g. JavaScript, data structures, project management" required maxLength={120} /></label>
         <label className="interview-label">What would you like to improve?<textarea value={weakPoints} onChange={e => setWeakPoints(e.target.value)} placeholder="e.g. explaining time complexity, speaking confidently, SQL joins" rows={3} maxLength={800} /></label>
         <div className="interview-label">Upload your resume <span className="interview-optional">optional · PDF, DOCX, TXT · up to 5 MB</span>
