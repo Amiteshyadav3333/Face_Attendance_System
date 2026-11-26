@@ -68,8 +68,7 @@ const Login = () => {
   return (
     <div className="login-page">
       <div className="login-container">
-        <h2>🎓 Face Attendance System</h2>
-        <p className="login-subtitle">Sign in to continue</p>
+        <h2>Face Attendance System</h2>
 
         <form onSubmit={handleEmailAuth} className="login-form">
           <input

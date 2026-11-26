@@ -17,6 +17,10 @@ export default function ChatHub({ role, students = [], initialDirectUserId = nul
   const [directory, setDirectory] = useState({ students: [], subjects: [], teachers: [] });
   const [conversations, setConversations] = useState([]);
   const [conversationId, setConversationId] = useState(null);
+  const [search, setSearch] = useState("");
+  const [showConversation, setShowConversation] = useState(false);
+  const messageList = useRef(null);
+  const followMessages = useRef(true);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("");
@@ -154,6 +158,7 @@ export default function ChatHub({ role, students = [], initialDirectUserId = nul
         const response = await createClassroomConversation({ conversation_type: "direct", participant_ids: [Number(initialDirectUserId)] });
         if (cancelled) return;
         setShowNew(false);
+        setShowConversation(true);
         setConversationId(response.data.conversation_id);
         await refreshConversations(response.data.conversation_id);
         setConversationId(response.data.conversation_id);
@@ -191,6 +196,7 @@ export default function ChatHub({ role, students = [], initialDirectUserId = nul
       if (kind === "class") payload.subject_id = subjectId;
       const response = await createClassroomConversation(payload);
       setShowNew(false);
+      setShowConversation(true);
       setSelectedUsers([]);
       setGroupTitle("");
       setReplyToAssignment(null);
@@ -392,12 +398,29 @@ export default function ChatHub({ role, students = [], initialDirectUserId = nul
     ? availableStudents
     : [...availableStudents, ...(directory.teachers || [])];
   const conversationTitle = (conversation) => conversation?.title || (conversation?.conversation_type === "class" ? "Class channel" : "Conversation");
+  const initials = (conversation) => conversationTitle(conversation).trim().split(/\s+/)
+    .slice(0, 2).map(word => word[0]).join("").toUpperCase();
+  const visibleConversations = conversations.filter(conversation =>
+    `${conversationTitle(conversation)} ${conversation.last_message || ""}`
+      .toLowerCase().includes(search.trim().toLowerCase())
+  );
+  const visibleMessages = items.filter(message => message.message_type !== "call_signal");
+  const latestMessageId = visibleMessages.at(-1)?.id;
+  const timeLabel = (createdAt) => createdAt
+    ? new Date(createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "";
+
+  useEffect(() => { followMessages.current = true; }, [conversationId, showConversation]);
+  useEffect(() => {
+    const list = messageList.current;
+    if (list && followMessages.current) list.scrollTop = list.scrollHeight;
+  }, [conversationId, showConversation, latestMessageId]);
+
   const previewMime = preview?.attachment_mime || "application/octet-stream";
 
   return (
-    <section className="classroom-chat" aria-label="Classroom chat">
+    <section className={`classroom-chat ${showConversation && selectedConversation ? "show-conversation" : ""}`} aria-label="Classroom chat">
       <aside className="classroom-chat__rail">
-        <div className="classroom-chat__brand"><span>✦</span><div><strong>Classroom</strong><small>Messages & learning</small></div></div>
+        <div className="classroom-chat__brand"><div><strong>Classroom</strong></div></div>
         <button className="classroom-chat__new" onClick={() => setShowNew((value) => !value)}>＋ New conversation</button>
         {showNew && <form className="classroom-chat__new-panel" onSubmit={startConversation}>
           <label>Conversation type<select value={kind} onChange={(event) => chooseKind(event.target.value)}>
@@ -414,11 +437,12 @@ export default function ChatHub({ role, students = [], initialDirectUserId = nul
           {kind === "group" && <label>Group name<input maxLength={160} value={groupTitle} onChange={(event) => setGroupTitle(event.target.value)} placeholder="e.g. Project team" required /></label>}
           <div className="classroom-chat__new-actions"><button type="button" onClick={() => setShowNew(false)}>Cancel</button><button type="submit" disabled={creating || (kind === "class" && !subjectId) || (kind === "direct" && selectedUsers.length !== 1) || (kind === "group" && (selectedUsers.length < 2 || selectedUsers.length > 249))}>{creating ? "Creating…" : "Create"}</button></div>
         </form>}
-        <p className="classroom-chat__section-label">YOUR CONVERSATIONS</p>
+        <input className="classroom-chat__search" aria-label="Search conversations" placeholder="Search conversations" value={search} onChange={event => setSearch(event.target.value)} />
           <nav className="classroom-chat__list" aria-label="Conversations">
-          {conversations.map((conversation) => <button key={conversation.id} className={`classroom-chat__item ${String(conversation.id) === String(conversationId) ? "is-active" : ""}`} onClick={() => { setConversationId(conversation.id); setPreview(null); setReplyToAssignment(null); setComposeType("text"); }}>
-            <span className={`classroom-chat__avatar ${conversation.conversation_type}`}>{conversation.conversation_type === "class" ? "▦" : conversation.conversation_type === "group" ? "◉" : "◌"}</span><span className="classroom-chat__item-copy"><strong>{conversationTitle(conversation)}</strong><small>{conversation.last_message || (conversation.conversation_type === "class" ? "Class announcements and assignments" : "Start a conversation")}</small></span>
+          {visibleConversations.map((conversation) => <button key={conversation.id} className={`classroom-chat__item ${String(conversation.id) === String(conversationId) ? "is-active" : ""}`} onClick={() => { setShowConversation(true); setConversationId(conversation.id); setPreview(null); setReplyToAssignment(null); setComposeType("text"); }}>
+            <span className={`classroom-chat__avatar ${conversation.conversation_type}`}>{initials(conversation)}</span><span className="classroom-chat__item-copy"><strong>{conversationTitle(conversation)}</strong><small>{conversation.last_message || (conversation.conversation_type === "class" ? "Class announcements and assignments" : "Start a conversation")}</small></span>
           </button>)}
+          {!loading && conversations.length > 0 && visibleConversations.length === 0 && <p className="classroom-chat__rail-empty">No matching conversations.</p>}
           {!loading && conversations.length === 0 && <div className="classroom-chat__rail-empty"><span>✉</span><p>No conversations yet. Start a chat or open a class channel.</p></div>}
         </nav>
         <div className="classroom-chat__preferences"><span>Message style</span><label>Font<select value={fontFamily} onChange={(event) => changeFont(event.target.value)}>{FONT_CHOICES.map((font) => <option key={font}>{font}</option>)}</select></label><label>Text size<select value={fontSize} onChange={(event) => changeFontSize(event.target.value)}>{[14,16,18,20].map((size) => <option key={size} value={size}>{size}px</option>)}</select></label></div>
@@ -426,18 +450,22 @@ export default function ChatHub({ role, students = [], initialDirectUserId = nul
 
       <div className="classroom-chat__main">
         {selectedConversation ? <>
-          <header className="classroom-chat__topbar"><div className="classroom-chat__channel-avatar">{selectedConversation.conversation_type === "class" ? "▦" : selectedConversation.conversation_type === "group" ? "◉" : "◌"}</div><div className="classroom-chat__channel-name"><p>{selectedConversation.conversation_type === "class" ? "CLASS CHANNEL" : selectedConversation.conversation_type === "group" ? "GROUP CONVERSATION" : "DIRECT MESSAGE"}</p><h2>{conversationTitle(selectedConversation)}</h2><small>{selectedConversation.members?.length || 2} members · messages sync automatically</small></div><button className="classroom-chat__call" onClick={startCall} disabled={selectedConversation.conversation_type !== "direct"}>◖ Audio call</button>{callActive && <button className="classroom-call-end" onClick={endCall}>End call</button>}</header>
-          <div className="classroom-chat__messages" role="log" aria-live="polite" style={{fontFamily,fontSize:`${fontSize}px`}}>
-            {items.filter((message) => message.message_type !== "call_signal").map((message) => <article key={message.id} className={`classroom-message ${message.is_mine ? "mine" : ""}`}>
-              <div className="classroom-message__meta"><strong>{message.is_mine ? "You" : message.sender_name}</strong><time>{message.created_at ? new Date(message.created_at).toLocaleString() : ""}</time><span>{message.message_type}</span></div>
-              {message.message_type === "assignment" ? <div className="classroom-card classroom-card--assignment"><span className="classroom-card__icon">📝</span><div><strong>Assignment</strong><p>{message.body}</p><small>{message.due_at ? `Due ${new Date(message.due_at).toLocaleString()}` : "No deadline"}</small></div>{role === "student" && message.due_at && new Date(message.due_at) > new Date() && <button onClick={() => submitAssignment(message.id)}>Submit work</button>}{role === "student" && message.due_at && new Date(message.due_at) <= new Date() && <small className="classroom-assignment-closed">Submission closed</small>}</div>
-                : message.message_type === "poll" ? <div className="classroom-card classroom-card--poll"><strong>📊 {message.body}</strong>{message.metadata?.options?.map((option,index) => { const count=message.metadata.vote_counts?.[String(index)]||0; return <button className={`classroom-poll-option ${message.metadata.my_vote===index?"voted":""}`} key={`${message.id}-${index}`} onClick={() => vote(message,index)}><span>{option}</span><small>{count} vote{count===1?"":"s"}</small></button>; })}</div>
-                : message.message_type === "event" ? <div className="classroom-card classroom-card--event"><span className="classroom-card__icon">📅</span><div><strong>{message.body}</strong><p>{message.metadata?.starts_at ? new Date(message.metadata.starts_at).toLocaleString() : ""}</p>{message.metadata?.location && <small>📍 {message.metadata.location}</small>}</div></div>
-                : message.message_type === "submission" ? <div className="classroom-card classroom-card--submission"><strong>📥 Assignment submission</strong><p>{message.body}</p></div>
+          <header className="classroom-chat__topbar"><button className="classroom-chat__back" onClick={() => setShowConversation(false)} aria-label="Back to conversations">←</button><div className="classroom-chat__channel-avatar">{initials(selectedConversation)}</div><div className="classroom-chat__channel-name"><p>{selectedConversation.conversation_type === "class" ? "CLASS CHANNEL" : selectedConversation.conversation_type === "group" ? "GROUP CONVERSATION" : "DIRECT MESSAGE"}</p><h2>{conversationTitle(selectedConversation)}</h2><small>{selectedConversation.members?.length || 2} members</small></div><button className="classroom-chat__call" onClick={startCall} disabled={selectedConversation.conversation_type !== "direct"}>◖ Audio call</button>{callActive && <button className="classroom-call-end" onClick={endCall}>End call</button>}</header>
+          <div className="classroom-chat__messages" ref={messageList} onScroll={event => {
+            const list = event.currentTarget;
+            followMessages.current = list.scrollHeight - list.scrollTop - list.clientHeight < 80;
+          }} role="log" aria-live="polite" style={{fontFamily,fontSize:`${fontSize}px`}}>
+            {visibleMessages.map((message) => <article key={message.id} className={`classroom-message ${message.is_mine ? "mine" : ""}`}>
+              <div className="classroom-message__meta"><strong>{message.is_mine ? "You" : message.sender_name}</strong>{message.message_type !== "text" && <span>{message.message_type}</span>}</div>
+              {message.message_type === "assignment" ? <div className="classroom-card classroom-card--assignment"><div><strong>Assignment</strong><p>{message.body}</p><small>{message.due_at ? `Due ${new Date(message.due_at).toLocaleString()}` : "No deadline"}</small></div>{role === "student" && message.due_at && new Date(message.due_at) > new Date() && <button onClick={() => submitAssignment(message.id)}>Submit work</button>}{role === "student" && message.due_at && new Date(message.due_at) <= new Date() && <small className="classroom-assignment-closed">Submission closed</small>}</div>
+                : message.message_type === "poll" ? <div className="classroom-card classroom-card--poll"><strong>{message.body}</strong>{message.metadata?.options?.map((option,index) => { const count=message.metadata.vote_counts?.[String(index)]||0; return <button className={`classroom-poll-option ${message.metadata.my_vote===index?"voted":""}`} key={`${message.id}-${index}`} onClick={() => vote(message,index)}><span>{option}</span><small>{count} vote{count===1?"":"s"}</small></button>; })}</div>
+                : message.message_type === "event" ? <div className="classroom-card classroom-card--event"><div><strong>{message.body}</strong><p>{message.metadata?.starts_at ? new Date(message.metadata.starts_at).toLocaleString() : ""}</p>{message.metadata?.location && <small>{message.metadata.location}</small>}</div></div>
+                : message.message_type === "submission" ? <div className="classroom-card classroom-card--submission"><strong>Assignment submission</strong><p>{message.body}</p></div>
                 : <p className="classroom-message__body">{message.body}</p>}
               {message.has_attachment && <div className="classroom-file"><span>▤</span><div><strong>{message.attachment_name || "Shared file"}</strong><small>{message.attachment_mime || "File"}</small></div><button onClick={() => openPreview(message)}>Open</button><button onClick={() => download(message)}>Download</button></div>}
+              {message.created_at && <time className="classroom-message__time" title={new Date(message.created_at).toLocaleString()}>{timeLabel(message.created_at)}</time>}
             </article>)}
-            {items.filter((message) => message.message_type !== "call_signal").length === 0 && <div className="classroom-chat__welcome"><span>✦</span><h3>Your classroom, connected.</h3><p>Share a message, assignment, poll, event or file to get started.</p></div>}
+            {visibleMessages.length === 0 && <div className="classroom-chat__welcome"><h3>No messages yet</h3><p>Share a message, assignment, poll, event or file to get started.</p></div>}
           </div>
           {pendingOffer && <div className="classroom-chat__incoming"><span>☎ Incoming audio call</span><button onClick={acceptCall}>Accept</button><button onClick={declineCall}>Decline</button></div>}
           <div className="classroom-chat__composer">
@@ -447,11 +475,11 @@ export default function ChatHub({ role, students = [], initialDirectUserId = nul
             {composeType === "poll" && <div className="classroom-poll-fields">{pollOptions.map((option,index) => <input key={index} value={option} maxLength={120} onChange={(event) => setPollOptions((current) => current.map((item,i) => i===index?event.target.value:item))} placeholder={`Poll option ${index+1}`} />)}{pollOptions.length<8 && <button onClick={() => setPollOptions((current) => [...current,""])}>＋ Add option</button>}</div>}
             {showEmoji && <div className="classroom-emoji-picker" aria-label="Emoji picker">{EMOJI.map((emoji) => <button type="button" key={emoji} onClick={() => addEmoji(emoji)}>{emoji}</button>)}</div>}
             {file && <div className="classroom-pending-file"><span>▤ {file.name} <small>{(file.data.length * .75 / 1024 / 1024).toFixed(1)} MB</small></span><button onClick={() => setFile(null)}>Remove</button></div>}
-            <div className="classroom-compose-row"><textarea ref={composerRef} value={text} onChange={(event) => setText(event.target.value)} onKeyDown={(event) => {if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();send();}}} placeholder={composeType === "assignment" ? "Describe the assignment…" : composeType === "poll" ? "Ask a question…" : composeType === "event" ? "Name this event…" : composeType === "submission" ? "Add a note with your submission…" : "Write a message…"} rows={2} /><button className="classroom-send" onClick={send}>Send <span>↗</span></button></div>
+            <div className="classroom-compose-row"><textarea ref={composerRef} value={text} onChange={(event) => setText(event.target.value)} onKeyDown={(event) => {if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();send();}}} placeholder={composeType === "assignment" ? "Describe the assignment…" : composeType === "poll" ? "Ask a question…" : composeType === "event" ? "Name this event…" : composeType === "submission" ? "Add a note with your submission…" : "Write a message…"} rows={2} /><button className="classroom-send" onClick={send}>Send</button></div>
             <small className="classroom-hint">Enter to send · Shift + Enter for a new line</small>
           </div>
           <audio id="classroom-audio" autoPlay />
-        </> : <div className="classroom-chat__empty-state"><span>✦</span><h2>Make space for better conversations.</h2><p>Start a one-to-one chat, create a group, or open a class channel.</p><button onClick={() => setShowNew(true)}>＋ Start a conversation</button></div>}
+        </> : <div className="classroom-chat__empty-state"><h2>No conversation selected</h2><p>Start a one-to-one chat, create a group, or open a class channel.</p><button onClick={() => setShowNew(true)}>Start a conversation</button></div>}
       </div>
 
       {preview && <div className="classroom-preview-backdrop" role="presentation" onClick={() => setPreview(null)}><section className="classroom-preview" role="dialog" aria-modal="true" aria-label={`Preview ${preview.attachment_name}`} onClick={(event) => event.stopPropagation()}><header><div><strong>{preview.attachment_name}</strong><small>{previewMime}</small></div><button onClick={() => setPreview(null)} aria-label="Close preview">×</button></header><div className="classroom-preview__body">{preview.unsupported ? <div className="classroom-preview__unsupported"><span>▤</span><h3>Preview unavailable for this file type</h3><p>You can still download and open it with an app on your device.</p><button onClick={async () => {const link=document.createElement("a");link.href=preview.attachment_data;link.download=preview.attachment_name||"file";link.click();}}>Download file</button></div>

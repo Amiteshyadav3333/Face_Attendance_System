@@ -2,6 +2,7 @@ import { downloadReport } from '../utils/downloadReport';
 import React, { useState, useEffect } from "react";
 import { auth } from "../firebase";
 import { signOut } from "firebase/auth";
+import { FiLogOut } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -254,8 +255,7 @@ const TeacherDashboard = ({ user }) => {
       <aside className={`td-sidebar ${sidebarOpen ? "open" : "collapsed"}`}>
         <div className="td-sidebar-header">
           <div className="td-logo">
-            <span className="td-logo-icon">🎓</span>
-            {sidebarOpen && <span className="td-logo-text">EduAttend</span>}
+            {sidebarOpen && <span className="td-logo-text">Face Attendance</span>}
           </div>
           <button className="td-toggle-btn" onClick={() => setSidebarOpen(!sidebarOpen)}>
             {sidebarOpen ? "◀" : "▶"}
@@ -300,8 +300,8 @@ const TeacherDashboard = ({ user }) => {
 
         {/* Logout */}
         <div className="td-sidebar-footer">
-          <button className="td-logout-btn" onClick={handleLogout} title="Logout">
-            <span>🚪</span>
+          <button className="td-logout-btn" onClick={handleLogout} title="Logout" aria-label="Log out">
+            <FiLogOut aria-hidden="true" />
             {sidebarOpen && <span>Logout</span>}
           </button>
         </div>
@@ -330,11 +330,11 @@ const TeacherDashboard = ({ user }) => {
             <button
               className={`td-tab-pill ${activeTab === "students" ? "active" : ""}`}
               onClick={() => setActiveTab("students")}
-            >🎓 Students</button>
+            >Students</button>
             <button
               className={`td-tab-pill ${activeTab === "projects" ? "active" : ""}`}
               onClick={() => setActiveTab("projects")}
-            >🚀 Projects</button>
+            >Projects</button>
             <button
               className={`td-tab-pill ${activeTab === "chat" ? "active" : ""}`}
               onClick={() => setActiveTab("chat")}
@@ -343,11 +343,11 @@ const TeacherDashboard = ({ user }) => {
             <button
               className={`td-tab-pill ${activeTab === "attendance" ? "active" : ""}`}
               onClick={() => setActiveTab("attendance")}
-            >📋 Attendance</button>
+            >Attendance</button>
             <button
               className={`td-tab-pill ${activeTab === "profile" ? "active" : ""}`}
               onClick={() => setActiveTab("profile")}
-            >👤 Profile</button>
+            >Profile</button>
           </div>
         </header>
 
@@ -383,7 +383,7 @@ const TeacherDashboard = ({ user }) => {
                       <span className="td-field-label">Subjects</span>
                       <span className="td-field-value">{subjects.length} assigned</span>
                     </div>
-                    <button className="td-btn-primary" onClick={() => setEditProfile(true)}>✏️ Edit Profile</button>
+                    <button className="td-btn-primary" onClick={() => setEditProfile(true)}>Edit profile</button>
                   </div>
                 ) : (
                   <div className="td-edit-form">
@@ -411,7 +411,6 @@ const TeacherDashboard = ({ user }) => {
             <>
               {!activeSubject ? (
                 <div className="td-empty-state">
-                  <div className="td-empty-icon">📚</div>
                   <h3>Select a Subject</h3>
                   <p>Choose a subject from the sidebar to manage attendance</p>
                 </div>
@@ -440,7 +439,7 @@ const TeacherDashboard = ({ user }) => {
                   )}
 
                   <details className="td-schedule-editor">
-                    <summary>🗓️ Campus hours, class timetable & teaching topics</summary>
+                    <summary>Campus hours, class timetable and topics</summary>
                     <form onSubmit={saveSubjectSchedule}>
                       <div className="td-schedule-grid">
                         <label>Campus opens<input type="time" required value={schedule.college_open_time} onChange={e => setSchedule({ ...schedule, college_open_time: e.target.value })} /></label>
@@ -459,7 +458,7 @@ const TeacherDashboard = ({ user }) => {
                   <div className="td-session-panel">
                     <div className="td-session-info">
                       <h3>Attendance Session</h3>
-                      <p>{sessionOpen ? "🟢 Session active — students can complete live verification on their phones" : "Session is not started"}</p>
+                      <p>{sessionOpen ? "Session open for live verification" : "Session closed"}</p>
                     </div>
                     {!sessionOpen ? (
                       <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
@@ -470,7 +469,7 @@ const TeacherDashboard = ({ user }) => {
                       </div>
                     ) : (
                       <button className="td-btn-stop" onClick={endSession}>
-                        ⏹ End Session
+                        End session
                       </button>
                     )}
                   </div>
@@ -479,7 +478,6 @@ const TeacherDashboard = ({ user }) => {
                   {sessionOpen && (
                     <div className="td-webcam-panel">
                       <div className="td-result-placeholder">
-                        <span>🛡️</span>
                         <h3>Live verification enabled</h3>
                         <p>Each student must sign in personally, complete the random blink and head-turn challenge, and match their registered face.</p>
                       </div>
@@ -495,7 +493,7 @@ const TeacherDashboard = ({ user }) => {
                           <label>Date <input aria-label="Attendance date" type="date" max={new Date().toISOString().slice(0, 10)} value={attendanceDate} onChange={e => changeAttendanceDate(e.target.value)} /></label>
                           <input
                             className="td-search"
-                            placeholder="🔍 Search by name or roll no..."
+                            placeholder="Search by name or roll number"
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
                           />
@@ -555,8 +553,8 @@ const TeacherDashboard = ({ user }) => {
                                     </td>
                                     <td>
                                       {pct < 75
-                                        ? <span className="td-badge danger">⚠️ Low</span>
-                                        : <span className="td-badge success">✅ Safe</span>}
+                                        ? <span className="td-badge danger">Below 75%</span>
+                                        : <span className="td-badge success">75% or above</span>}
                                     </td>
                                     <td>
                                       {s.selected_date_status === "present"

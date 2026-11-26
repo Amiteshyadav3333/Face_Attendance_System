@@ -203,7 +203,7 @@ const StudentAttendance = ({ user }) => {
       const result = await studentMarkByLiveness(livenessSubject.subject_id, challenge.token, frames, location);
       const confirmation = result.data.message || "Face recognized successfully. Your attendance is marked.";
       setAttendanceNotice(`${confirmation} · ${livenessSubject.subject_name}`);
-      toast.success(`✅ ${confirmation}`, { autoClose: 5000 });
+      toast.success(confirmation, { autoClose: 5000 });
       setCaptureStage("");
       setChallenge(null);
       setLivenessSubject(null);
@@ -229,7 +229,7 @@ const StudentAttendance = ({ user }) => {
       {/* Header */}
       <header className="sa-header">
         <div className="sa-header-left">
-          <div className="sa-logo">🎓 <span>EduAttend</span></div>
+          <div className="sa-logo"><span>Face Attendance</span></div>
         </div>
         <div className="sa-header-center">
           <h1>{activeView === "dashboard" ? "Student Dashboard" : activeView === "chat" ? "Classroom Chat" : activeView === "projects" ? "My Projects" : "Interview Agent"}</h1>
@@ -248,8 +248,8 @@ const StudentAttendance = ({ user }) => {
       <nav className="sa-view-nav" aria-label="Student dashboard sections">
         <button className={activeView === "dashboard" ? "active" : ""} onClick={() => setActiveView("dashboard")}>▦ <span>Overview</span></button>
         <button className={activeView === "chat" ? "active" : ""} onClick={() => setActiveView("chat")}>✉ <span>Chat</span></button>
-        <button className={activeView === "projects" ? "active" : ""} onClick={() => setActiveView("projects")}>🚀 <span>Projects</span></button>
-        <button className={activeView === "interview" ? "active" : ""} onClick={() => setActiveView("interview")}>🎙️ <span>Interview Agent</span></button>
+        <button className={activeView === "projects" ? "active" : ""} onClick={() => setActiveView("projects")}><span>Projects</span></button>
+        <button className={activeView === "interview" ? "active" : ""} onClick={() => setActiveView("interview")}><span>Interview practice</span></button>
       </nav>
 
       {activeView === "chat" ? (
@@ -259,7 +259,7 @@ const StudentAttendance = ({ user }) => {
       ) : activeView === "interview" ? (
         <InterviewAgent />
       ) : <>
-      {attendanceNotice && <div role="status" aria-live="polite" className="sa-attendance-notice">✅ {attendanceNotice}</div>}
+      {attendanceNotice && <div role="status" aria-live="polite" className="sa-attendance-notice">{attendanceNotice}</div>}
       <div className="sa-body">
         {/* Profile + Summary Row */}
         <div className="sa-top-row">
@@ -285,7 +285,7 @@ const StudentAttendance = ({ user }) => {
             <div className="sa-overall-info">
               <h3>Overall Attendance</h3>
               <p className={overallPercent < 75 ? "sa-danger-text" : "sa-safe-text"}>
-                {overallPercent >= 75 ? "✅ You're on track!" : "⚠️ Attendance is low!"}
+                {overallPercent >= 75 ? "Meets the 75% requirement" : "Below the 75% requirement"}
               </p>
             </div>
           </div>
@@ -310,9 +310,8 @@ const StudentAttendance = ({ user }) => {
         {/* Warning Banner */}
         {atRiskSubjects > 0 && (
           <div className="sa-warning-banner">
-            <span className="sa-warning-icon">⚠️</span>
             <div>
-              <strong>Attendance Warning!</strong>
+              <strong>Low attendance</strong>
               <p>You are below 75% in {atRiskSubjects} subject{atRiskSubjects > 1 ? "s" : ""}. Minimum 75% attendance is compulsory.</p>
             </div>
           </div>
@@ -326,7 +325,6 @@ const StudentAttendance = ({ user }) => {
 
         {attendance.length === 0 ? (
           <div className="sa-empty">
-            <span>📋</span>
             <p>No attendance records found yet.</p>
           </div>
         ) : (
@@ -350,7 +348,7 @@ const StudentAttendance = ({ user }) => {
                       </div>
                       <div className="sa-card-info">
                         <h3>{sub.subject_name}</h3>
-                        <p>👨🏫 {sub.teacher_name}</p>
+                        <p>{sub.teacher_name}</p>
                       </div>
                     </div>
                     <div className="sa-card-right">
@@ -359,9 +357,9 @@ const StudentAttendance = ({ user }) => {
                   </div>
 
                   <div className="sa-class-info">
-                    {sub.college_open_time && sub.college_close_time ? <div className="sa-campus-hours"><span>🏫 Campus</span><strong>{sub.college_open_time} – {sub.college_close_time}</strong></div> : <div className="sa-campus-hours is-empty"><span>🏫 Campus hours</span><strong>Not published</strong></div>}
+                    {sub.college_open_time && sub.college_close_time ? <div className="sa-campus-hours"><span>Campus</span><strong>{sub.college_open_time} – {sub.college_close_time}</strong></div> : <div className="sa-campus-hours is-empty"><span>Campus hours</span><strong>Not published</strong></div>}
                     {sub.class_start_time && sub.class_end_time ? <div className="sa-class-hours"><span>Class {sub.class_days ? `· ${sub.class_days}` : "time"}</span><strong>{sub.class_start_time} – {sub.class_end_time}</strong></div> : <div className="sa-class-hours is-empty"><span>Class schedule</span><strong>Not published</strong></div>}
-                    <div className="sa-topic-now"><span>📖 Teacher's topic</span><strong>{sub.current_topic || "Not updated yet"}</strong>{sub.topic_updated_at && <small>Updated {new Date(sub.topic_updated_at).toLocaleString()}</small>}</div>
+                    <div className="sa-topic-now"><span>Current topic</span><strong>{sub.current_topic || "Not updated yet"}</strong>{sub.topic_updated_at && <small>Updated {new Date(sub.topic_updated_at).toLocaleString()}</small>}</div>
                     {sub.next_topic && <div className="sa-topic-next"><span>Up next</span><strong>{sub.next_topic}</strong></div>}
                   </div>
 
@@ -410,12 +408,12 @@ const StudentAttendance = ({ user }) => {
                   ) : sub.is_below_75 ? (
                     <div className="sa-status-bar danger">
                       {sub.total_classes > 0
-                        ? `⚠️ Need ${needed} more class${needed !== 1 ? "es" : ""} to reach 75%`
-                        : "⚠️ Below 75% attendance"}
+                        ? `Need ${needed} more class${needed !== 1 ? "es" : ""} to reach 75%`
+                        : "Below 75% attendance"}
                     </div>
                   ) : (
                     <div className="sa-status-bar success">
-                      ✅ Attendance requirement fulfilled
+                      Attendance requirement met
                     </div>
                   )}
 
@@ -426,7 +424,7 @@ const StudentAttendance = ({ user }) => {
                       onClick={(e) => { e.stopPropagation(); beginLiveness(sub); }}
                       disabled={livenessBusy}
                     >
-                      📷 Mark My Attendance
+                      Mark attendance
                     </button>
                   )}
 

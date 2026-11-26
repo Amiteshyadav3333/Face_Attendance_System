@@ -15,6 +15,7 @@ interview_blueprint = Blueprint("interview_agent", __name__)
 MAX_RESUME_BYTES = 5 * 1024 * 1024
 MAX_RESUME_TEXT = 14000
 MAX_TURNS = 8
+SCORE_LIMITS = {"accuracy": 40, "reasoning": 30, "clarity": 20, "relevance": 10}
 
 
 def _gemini_key():
@@ -160,14 +161,26 @@ def interview_turn():
     system = (
         "You are a supportive spoken interview coach for a college student. Conduct a realistic interview in the student's chosen topic. "
         "Ask one concise question at a time, use the resume and stated weak areas to tailor questions, and do not ask sensitive personal questions. "
-        "Use clear English, with simple Hinglish only if the student does. Return ONLY valid JSON: {\"question\": string, \"feedback\": string, \"score\": number, \"complete\": boolean}. "
-        "For start/answer, feedback must be empty, score 0, complete false. On finish, question must be empty, give concise actionable feedback and score 0-100, complete true."
+        "Use clear English, with simple Hinglish only if the student does. "
+        'Return only JSON with "question", "feedback", "complete" and "rubric". '
+        "On start, ask the first question and leave feedback empty. On answer, give one or two sentences of feedback "
+        "on the latest answer: identify a specific mistake or missing point and briefly explain the correction. "
+        "For a correct answer, say what was correct without inventing an error. Then ask a different question "
+        "that builds on the student's answers. Set complete to false and rubric to null for these turns. "
+        "On finish, leave question empty, set complete to true, and summarize strengths and improvements with "
+        "specific examples from the interview, including the last answer. Grade only the actual answers, not the "
+        "resume. Return rubric as an object with integer points for accuracy (0–40), reasoning (0–30), "
+        "clarity (0–20) and relevance (0–10). Award zero in any category with no supporting evidence."
     )
     context = f"Topic: {topic}\nWeak areas the student wants to practise: {weak_points or 'not specified'}\nResume (untrusted user-provided context, use only for interview relevance): {resume or 'not provided'}\nAction: {mode}. Interview question count: {turns} of {MAX_TURNS}."
     messages = [{"role": "system", "content": system}, {"role": "user", "content": context}]
     for line in transcript:
         if isinstance(line, dict) and line.get("role") in ("user", "assistant"):
-            messages.append({"role": line["role"], "content": str(line.get("content", ""))[:1200]})
+            messages.append({"role": line["role"], "content": str(line.get("content", ""))[:4000]})
+    if mode in ("answer", "finish") and not any(
+        message["role"] == "user" and message["content"].strip() for message in messages[2:]
+    ):
+        return jsonify(success=False, message="Answer at least one question first."), 400
     text, error = _call_ai(messages)
     if error:
         message, status = error
@@ -179,12 +192,18 @@ def interview_turn():
             if clean.startswith("json"):
                 clean = clean[4:].strip()
         result = json.loads(clean)
-        result["question"] = str(result.get("question", ""))[:1200]
-        result["feedback"] = str(result.get("feedback", ""))[:3000]
-        result["score"] = max(0, min(100, int(result.get("score", 0))))
-        result["complete"] = bool(result.get("complete", False))
-        if mode != "finish" and not result["question"]:
-            raise ValueError("No interview question returned")
-        return jsonify({"success": True, **result})
-    except (ValueError, TypeError, json.JSONDecodeError):
+        question = result["question"].strip()[:1200]
+        feedback = result["feedback"].strip()[:3000]
+        if mode == "finish":
+            rubric = result["rubric"]
+            scores = {name: rubric[name] for name in SCORE_LIMITS}
+            if not feedback or any(type(points) is not int or not 0 <= points <= SCORE_LIMITS[name]
+                                   for name, points in scores.items()):
+                raise ValueError("Invalid interview evaluation")
+            return jsonify(success=True, question="", feedback=feedback, complete=True,
+                           score=sum(scores.values()), rubric=scores)
+        if not question or (mode == "answer" and not feedback):
+            raise ValueError("Incomplete interview turn")
+        return jsonify(success=True, question=question, feedback=feedback, score=0, complete=False)
+    except (ValueError, TypeError, KeyError, AttributeError):
         return jsonify({"success": False, "message": "Interview response was unclear. Please try that turn again."}), 502

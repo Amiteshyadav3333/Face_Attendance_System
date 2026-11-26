@@ -1,11 +1,11 @@
 .project-hub,.project-public { --ph-bg:#07111f; --ph-panel:#0c1929; --ph-panel2:#102238; --ph-border:#1e3954; --ph-text:#e8f2ff; --ph-muted:#8da4bf; --ph-cyan:#64ddff; color:var(--ph-text); font-family:Inter,ui-sans-serif,system-ui,sans-serif; }
-.project-hub { width:min(1240px,calc(100% - 30px)); margin:24px auto; padding:20px; border:1px solid #244260; border-radius:22px; background:radial-gradient(ellipse at 80% 0%,#12304b88,transparent 36%),linear-gradient(145deg,#091522,#07111d); box-shadow:0 24px 75px #02061766; }
+.project-hub { width:min(1240px,calc(100% - 30px)); margin:24px auto; padding:20px; border:1px solid #244260; border-radius:22px; background:var(--ph-bg); }
 .project-hub button,.project-hub input,.project-hub select,.project-hub textarea { font:inherit; }
 .project-hub button { cursor:pointer; }
 .project-hub__hero { display:flex; justify-content:space-between; align-items:center; gap:18px; padding:10px 8px 24px; border-bottom:1px solid #1c334a; }
 .project-kicker { color:#5bd8fa; font-size:.65rem; font-weight:850; letter-spacing:.14em; text-transform:uppercase; }
 .project-hub__hero h1 { margin:6px 0; font-size:clamp(1.5rem,3vw,2.2rem); letter-spacing:-.04em; }
-.project-hub__hero p,.project-detail-head p { margin:0; color:var(--ph-muted); font-size:.85rem; }
+.project-detail-head p { margin:0; color:var(--ph-muted); font-size:.85rem; }
 .project-primary,.project-secondary { min-height:41px; padding:0 15px; border-radius:11px; font-size:.78rem; font-weight:800; white-space:nowrap; }
 .project-primary { color:#041722; background:linear-gradient(110deg,#70e6ff,#719eff); border:0; box-shadow:0 8px 24px #21b9d733; }
 .project-primary:disabled { opacity:.5; cursor:not-allowed; }
@@ -35,8 +35,7 @@
 .project-rail-title small { color:#91a8bd; font-size:.67rem; letter-spacing:0; }
 .project-team { display:flex; align-items:center; gap:9px; width:100%; margin:4px 0; padding:9px; text-align:left; color:#dceafd; background:#0d1c2c; border:1px solid transparent; border-radius:10px; }
 .project-team.is-active { background:linear-gradient(100deg,#12344b,#14263b); border-color:#28607a; box-shadow:inset 2px 0 #64ddff; }
-.project-team__icon { display:grid; place-items:center; width:33px; height:33px; flex:0 0 33px; color:#041c28; background:linear-gradient(135deg,#69e6ff,#809eff); border-radius:10px; }
-.project-team>span:nth-child(2) { display:grid; min-width:0; flex:1; gap:3px; }
+.project-team>span:first-child { display:grid; min-width:0; flex:1; gap:3px; }
 .project-team strong { overflow:hidden; font-size:.73rem; text-overflow:ellipsis; white-space:nowrap; }
 .project-team small { color:#829bb4; font-size:.64rem; }
 .project-team>b { color:#7ce6ff; font-size:.72rem; }
@@ -88,10 +87,9 @@
 .project-score-edit { display:grid; grid-template-columns:85px minmax(120px,1fr) auto; gap:6px; margin-top:9px; }
 .project-score-edit input { padding:7px; }
 .project-hub__empty,.project-public__empty { display:grid; justify-items:center; align-content:center; min-height:360px; padding:20px; text-align:center; }
-.project-hub__empty>span,.project-public__empty>span { display:grid; place-items:center; width:52px; height:52px; color:#031a25; background:linear-gradient(135deg,#72e8ff,#849cff); border-radius:16px; font-size:1.5rem; }
 .project-hub__empty h2,.project-public__empty h1 { margin:14px 0 4px; font-size:1.1rem; }
 .project-hub__empty p,.project-public__empty p { max-width:390px; color:var(--ph-muted); font-size:.78rem; line-height:1.5; }
-.project-public { min-height:100vh; padding-bottom:40px; background:radial-gradient(ellipse at 50% 0,#143653 0,transparent 38%),#07111f; }
+.project-public { min-height:100vh; padding-bottom:40px; background:var(--ph-bg); }
 .project-public__top { display:flex; justify-content:space-between; padding:20px max(20px,calc((100% - 980px)/2)); color:#8da8bf; font-size:.72rem; }
 .project-public__top strong { color:#daf1ff; }
 .project-public__hero,.project-public__members,.project-public__timeline { width:min(980px,calc(100% - 32px)); margin:18px auto; padding:24px; background:#0b1929dd; border:1px solid #203b54; border-radius:17px; }

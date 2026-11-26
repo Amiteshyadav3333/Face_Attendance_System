@@ -199,7 +199,7 @@ const AdminDashboard = ({ user }) => {
   return (
     <div className="admin-container">
       <div className="admin-header">
-        <h1>🛡️ Admin Dashboard</h1>
+        <h1>Admin Dashboard</h1>
         <div className="header-right">
           <ProfileAvatar name={user?.displayName || user?.email} className="admin-profile-avatar" />
           <span>{user?.email}</span>
@@ -398,7 +398,7 @@ const AdminDashboard = ({ user }) => {
           <div>
             <div className="attendance-header">
               <h2>Full Attendance Report</h2>
-              <button onClick={handleExport} className="btn-export">📤 Export CSV</button>
+              <button onClick={handleExport} className="btn-export">Export CSV</button>
             </div>
             <table className="data-table">
               <thead><tr><th>Date</th><th>Student</th><th>Roll No.</th><th>Year</th><th>Subject</th><th>Teacher</th><th>Status</th></tr></thead>

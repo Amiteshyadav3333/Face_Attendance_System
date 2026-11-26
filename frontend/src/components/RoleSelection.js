@@ -12,7 +12,7 @@ const RoleSelection = ({ email }) => {
     <div className="rs-root">
       <div className="rs-card">
         <div className="rs-header">
-          <div className="rs-logo">🎓 EduAttend</div>
+          <div className="rs-logo">Face Attendance</div>
           <button className="rs-logout" onClick={handleLogout}>Sign out</button>
         </div>
         <div className="rs-step">
