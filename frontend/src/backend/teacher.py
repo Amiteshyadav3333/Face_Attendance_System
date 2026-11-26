@@ -3,7 +3,7 @@ from db_connect import get_db_connection
 from auth_middleware import role_required
 from academic_years import normalize_academic_year
 from firebase_admin import auth as firebase_auth
-from datetime import datetime, timedelta, date
+from datetime import datetime, date
 import base64
 import binascii
 import csv
@@ -204,8 +204,8 @@ def enroll_student_face(student_id):
 def start_attendance_session(subject_id):
     teacher_id = get_teacher_id(request.current_user["id"])
     payload = request.get_json(silent=True) or {}
-    duration = min(max(int(payload.get("duration_minutes", 10)), 2), 30)
     try:
+        duration = min(max(int(payload.get("duration_minutes", 10)), 2), 30)
         radius = int(payload.get("radius_meters", 250))
         if not 25 <= radius <= 5000:
             raise ValueError()
@@ -240,12 +240,13 @@ def start_attendance_session(subject_id):
             "expires_at": existing["expires_at"].isoformat(),
         }), 409
     cursor.execute("UPDATE attendance_sessions SET is_active=FALSE WHERE subject_id=%s AND is_active=TRUE", (subject_id,))
-    expires_at = datetime.now() + timedelta(minutes=duration)
     cursor.execute(
-        "INSERT INTO attendance_sessions (subject_id,teacher_id,expires_at,is_active,center_lat,center_lng,radius_meters) VALUES (%s,%s,%s,TRUE,%s,%s,%s)",
-        (subject_id, teacher_id, expires_at, center_lat, center_lng, radius)
+        "INSERT INTO attendance_sessions (subject_id,teacher_id,expires_at,is_active,center_lat,center_lng,radius_meters) VALUES (%s,%s,DATE_ADD(NOW(), INTERVAL %s MINUTE),TRUE,%s,%s,%s)",
+        (subject_id, teacher_id, duration, center_lat, center_lng, radius)
     )
     session_id = cursor.lastrowid
+    cursor.execute("SELECT expires_at FROM attendance_sessions WHERE id=%s", (session_id,))
+    expires_at = cursor.fetchone()["expires_at"]
     cursor.execute("UPDATE subjects SET total_classes=total_classes+1 WHERE id=%s", (subject_id,))
     conn.commit()
     conn.close()
@@ -315,7 +316,10 @@ def get_subject_attendance(subject_id):
           TIME_FORMAT(class_start_time,'%%H:%%i') AS class_start_time,
           TIME_FORMAT(class_end_time,'%%H:%%i') AS class_end_time,
           class_days,current_topic,next_topic,
-          DATE_FORMAT(topic_updated_at,'%%Y-%%m-%%dT%%H:%%i:%%S') AS topic_updated_at
+          DATE_FORMAT(topic_updated_at,'%%Y-%%m-%%dT%%H:%%i:%%S') AS topic_updated_at,
+          (SELECT MAX(sessions.id) FROM attendance_sessions sessions
+           WHERE sessions.subject_id=subjects.id AND sessions.is_active=TRUE
+             AND sessions.expires_at>NOW()) AS active_session_id
         FROM subjects WHERE id=%s AND teacher_id=%s
     """, (subject_id, teacher_id))
     subject = cursor.fetchone()
@@ -336,7 +340,7 @@ def get_subject_attendance(subject_id):
         JOIN subjects sub ON sub.id = %s
         LEFT JOIN attendance a ON a.student_id = s.id AND a.subject_id = %s
         WHERE s.year = sub.year
-        GROUP BY s.id, s.name, s.roll_number, s.year, sub.total_classes
+        GROUP BY s.id, s.user_id, s.name, s.roll_number, s.year, sub.total_classes
         ORDER BY s.roll_number
     """, (attendance_date, attendance_date, attendance_date, subject_id, subject_id))
     students = cursor.fetchall()

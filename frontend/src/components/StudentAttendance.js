@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { auth } from "../firebase";
 import { signOut } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
@@ -6,6 +6,9 @@ import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { studentGetAttendance, studentEnrollMyFace } from "../utils/api";
 import { studentGetLivenessChallenge, studentMarkByLiveness } from "../utils/api";
+import { checkAttendanceDevice, getAttendanceLocation } from "../utils/attendanceLocation";
+import { isAndroidApp } from "../utils/downloadReport";
+import MobileRoleNav from "./MobileRoleNav";
 import Webcam from "react-webcam";
 import ChatHub from "./ChatHub";
 import ProjectHub from "./ProjectHub";
@@ -61,24 +64,6 @@ const StudentAttendance = ({ user }) => {
   const [activeView, setActiveView] = useState("dashboard");
   const webcamRef = useRef(null);
 
-  useEffect(() => {
-    studentGetAttendance()
-      .then(res => {
-        setProfile(res.data.profile);
-        setAttendance(res.data.attendance.map(subject => ({
-          ...subject,
-          percentage: Number(subject.percentage) || 0,
-          attended_classes: Number(subject.attended_classes) || 0,
-          total_classes: Number(subject.total_classes) || 0
-        })));
-        setLoading(false);
-      })
-      .catch(() => {
-        toast.error("Failed to load attendance data");
-        setLoading(false);
-      });
-  }, []);
-
   const handleLogout = async () => {
     await signOut(auth);
     localStorage.clear();
@@ -105,7 +90,7 @@ const StudentAttendance = ({ user }) => {
     return Math.max(0, Math.floor((sub.attended_classes || 0) / 0.75 - sub.total_classes));
   };
 
-  const refreshAttendance = async () => {
+  const refreshAttendance = useCallback(async () => {
     const res = await studentGetAttendance();
     setProfile(res.data.profile);
     setAttendance(res.data.attendance.map(subject => ({
@@ -114,7 +99,25 @@ const StudentAttendance = ({ user }) => {
       attended_classes: Number(subject.attended_classes) || 0,
       total_classes: Number(subject.total_classes) || 0
     })));
-  };
+  }, []);
+
+  useEffect(() => {
+    refreshAttendance().catch(() => toast.error("Failed to load attendance data"))
+      .finally(() => setLoading(false));
+  }, [refreshAttendance]);
+
+  useEffect(() => {
+    if (activeView !== "dashboard" || challenge) return;
+    const refresh = () => {
+      if (document.visibilityState === "visible") refreshAttendance().catch(() => {});
+    };
+    const timer = setInterval(refresh, 12000);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [activeView, challenge, refreshAttendance]);
 
   const beginLiveness = async (subject) => {
     setAttendanceNotice("");
@@ -127,6 +130,13 @@ const StudentAttendance = ({ user }) => {
       return;
     }
     setLivenessBusy(true);
+    try {
+      await checkAttendanceDevice();
+    } catch (error) {
+      toast.error(error.message);
+      setLivenessBusy(false);
+      return;
+    }
     setCameraReady(false);
     setCameraError("");
     setCaptureStage("");
@@ -183,9 +193,13 @@ const StudentAttendance = ({ user }) => {
     setLivenessBusy(true);
     const frames = [];
     try {
+      setCaptureStage("Checking your attendance location…");
+      const location = await getAttendanceLocation();
+      const freshChallenge = (await studentGetLivenessChallenge(livenessSubject.subject_id)).data;
+      setChallenge(freshChallenge);
       for (let i = 0; i < 20; i += 1) {
         if (i < 4) setCaptureStage("Look straight at the camera and keep your full face in frame.");
-        else if (i < 11) setCaptureStage(`Blink ${challenge.blink_count} time${challenge.blink_count === 1 ? "" : "s"} now.`);
+        else if (i < 11) setCaptureStage(`Blink ${freshChallenge.blink_count} time${freshChallenge.blink_count === 1 ? "" : "s"} now.`);
         else if (i < 17) setCaptureStage("Slowly turn your head to either side, then face the camera again.");
         else setCaptureStage("Hold your face still while we verify your identity.");
         await new Promise(resolve => setTimeout(resolve, 320));
@@ -194,13 +208,8 @@ const StudentAttendance = ({ user }) => {
       }
       setCaptureStage("Checking your face and attendance location…");
       if (frames.length < 8) throw new Error("Camera did not capture enough live frames");
-      if (!navigator.geolocation) throw new Error("Location access is required for attendance");
-      const location = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(
-        p => resolve({ latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: p.coords.accuracy }),
-        () => reject(new Error("Could not verify your location. Allow location access and try again.")),
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-      ));
-      const result = await studentMarkByLiveness(livenessSubject.subject_id, challenge.token, frames, location);
+      await checkAttendanceDevice();
+      const result = await studentMarkByLiveness(livenessSubject.subject_id, freshChallenge.token, frames, location);
       const confirmation = result.data.message || "Face recognized successfully. Your attendance is marked.";
       setAttendanceNotice(`${confirmation} · ${livenessSubject.subject_name}`);
       toast.success(confirmation, { autoClose: 5000 });
@@ -225,7 +234,7 @@ const StudentAttendance = ({ user }) => {
   );
 
   return (
-    <div className="sa-root">
+    <div className={`sa-root ${isAndroidApp ? "mobile-role-page" : ""}`}>
       {/* Header */}
       <header className="sa-header">
         <div className="sa-header-left">
@@ -245,12 +254,12 @@ const StudentAttendance = ({ user }) => {
           <button onClick={handleLogout} className="sa-logout-btn">Logout</button>
         </div>
       </header>
-      <nav className="sa-view-nav" aria-label="Student dashboard sections">
+      {isAndroidApp ? <MobileRoleNav role="student" active={activeView} onChange={setActiveView} /> : <nav className="sa-view-nav" aria-label="Student dashboard sections">
         <button className={activeView === "dashboard" ? "active" : ""} onClick={() => setActiveView("dashboard")}>▦ <span>Overview</span></button>
         <button className={activeView === "chat" ? "active" : ""} onClick={() => setActiveView("chat")}>✉ <span>Chat</span></button>
         <button className={activeView === "projects" ? "active" : ""} onClick={() => setActiveView("projects")}><span>Projects</span></button>
         <button className={activeView === "interview" ? "active" : ""} onClick={() => setActiveView("interview")}><span>Interview practice</span></button>
-      </nav>
+      </nav>}
 
       {activeView === "chat" ? (
         profile?.id ? <div className="sa-tool-page"><ChatHub studentId={profile.id} role="student" /></div> : <div className="sa-empty"><p>Student profile is still loading.</p></div>
@@ -473,8 +482,8 @@ const StudentAttendance = ({ user }) => {
               audio={false}
               mirrored
               screenshotFormat="image/jpeg"
-              screenshotQuality={0.82}
-              videoConstraints={{ facingMode: "user", width: 640, height: 480 }}
+              screenshotQuality={0.72}
+              videoConstraints={{ facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }}
               onUserMedia={() => {
                 setCameraReady(true);
                 setCameraError("");

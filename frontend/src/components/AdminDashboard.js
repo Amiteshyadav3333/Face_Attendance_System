@@ -1,5 +1,5 @@
 import { downloadReport, isAndroidApp } from '../utils/downloadReport';
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { auth } from "../firebase";
 import { signOut } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
@@ -14,6 +14,7 @@ import {
   adminGetAttendance, adminUpdateAttendance, exportAttendance
 } from "../utils/api";
 import "./AdminDashboard.css";
+import MobileRoleNav from "./MobileRoleNav";
 import ProfileAvatar from "./ProfileAvatar";
 
 const TABS = ["Users", "Teachers", "Students", "Subjects", "Attendance"];
@@ -34,9 +35,7 @@ const AdminDashboard = ({ user }) => {
   const [editSubject, setEditSubject] = useState(null);
   const [faceUploading, setFaceUploading] = useState(null);
 
-  useEffect(() => { fetchTab(activeTab); }, [activeTab]);
-
-  const fetchTeachers = async () => {
+  const fetchTeachers = useCallback(async () => {
     setTeachersStatus("loading");
     try {
       const { data } = await adminGetTeachers();
@@ -44,8 +43,9 @@ const AdminDashboard = ({ user }) => {
       setTeachersStatus("ready");
     } catch {
       setTeachersStatus("error");
+      toast.error("Could not load teachers.");
     }
-  };
+  }, []);
 
   const teacherPlaceholder = {
     loading: "Loading teachers…",
@@ -53,16 +53,18 @@ const AdminDashboard = ({ user }) => {
     ready: teachers.length ? "Select Teacher" : "No teachers available"
   }[teachersStatus];
 
-  const fetchTab = (tab) => {
-    if (tab === "Users") adminGetUsers().then(r => setUsers(r.data.users)).catch(() => {});
+  const fetchTab = useCallback((tab) => {
+    if (tab === "Users") adminGetUsers().then(r => setUsers(r.data.users)).catch(() => toast.error("Could not load users."));
     if (tab === "Teachers") fetchTeachers();
-    if (tab === "Students") adminGetStudents().then(r => setStudents(r.data.students)).catch(() => {});
+    if (tab === "Students") adminGetStudents().then(r => setStudents(r.data.students)).catch(() => toast.error("Could not load students."));
     if (tab === "Subjects") {
-      adminGetSubjects().then(r => setSubjects(r.data.subjects)).catch(() => {});
+      adminGetSubjects().then(r => setSubjects(r.data.subjects)).catch(() => toast.error("Could not load subjects."));
       fetchTeachers();
     }
-    if (tab === "Attendance") adminGetAttendance().then(r => setAttendance(r.data.attendance)).catch(() => {});
-  };
+    if (tab === "Attendance") adminGetAttendance().then(r => setAttendance(r.data.attendance)).catch(() => toast.error("Could not load attendance."));
+  }, [fetchTeachers]);
+
+  useEffect(() => { fetchTab(activeTab); }, [activeTab, fetchTab]);
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -197,7 +199,7 @@ const AdminDashboard = ({ user }) => {
   };
 
   return (
-    <div className="admin-container">
+    <div className={`admin-container ${isAndroidApp ? "mobile-role-page" : ""}`}>
       <div className="admin-header">
         <h1>Admin Dashboard</h1>
         <div className="header-right">
@@ -207,13 +209,13 @@ const AdminDashboard = ({ user }) => {
         </div>
       </div>
 
-      <div className="tabs">
+      {isAndroidApp ? <MobileRoleNav role="admin" active={activeTab} onChange={setActiveTab} /> : <div className="tabs">
         {TABS.map(tab => (
           <button key={tab} className={`tab-btn ${activeTab === tab ? "active" : ""}`} onClick={() => setActiveTab(tab)}>
             {tab}
           </button>
         ))}
-      </div>
+      </div>}
 
       <div className="tab-content">
 

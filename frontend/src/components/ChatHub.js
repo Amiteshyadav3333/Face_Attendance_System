@@ -1,3 +1,4 @@
+import { downloadAttachment, isAndroidApp } from "../utils/downloadReport";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createClassroomConversation,
@@ -302,11 +303,8 @@ export default function ChatHub({ role, students = [], initialDirectUserId = nul
   const download = async (message) => {
     try {
       const attachment = await getAttachment(message);
-      const link = document.createElement("a");
-      link.href = attachment.attachment_data;
-      link.download = attachment.attachment_name || "attachment";
-      link.click();
-      setStatus("Download started");
+      downloadAttachment(attachment.attachment_data, attachment.attachment_name || "attachment");
+      if (!isAndroidApp) setStatus("Download started");
     } catch (error) {
       setStatus(error.response?.data?.message || "Download failed");
     }
@@ -482,7 +480,7 @@ export default function ChatHub({ role, students = [], initialDirectUserId = nul
         </> : <div className="classroom-chat__empty-state"><h2>No conversation selected</h2><p>Start a one-to-one chat, create a group, or open a class channel.</p><button onClick={() => setShowNew(true)}>Start a conversation</button></div>}
       </div>
 
-      {preview && <div className="classroom-preview-backdrop" role="presentation" onClick={() => setPreview(null)}><section className="classroom-preview" role="dialog" aria-modal="true" aria-label={`Preview ${preview.attachment_name}`} onClick={(event) => event.stopPropagation()}><header><div><strong>{preview.attachment_name}</strong><small>{previewMime}</small></div><button onClick={() => setPreview(null)} aria-label="Close preview">×</button></header><div className="classroom-preview__body">{preview.unsupported ? <div className="classroom-preview__unsupported"><span>▤</span><h3>Preview unavailable for this file type</h3><p>You can still download and open it with an app on your device.</p><button onClick={async () => {const link=document.createElement("a");link.href=preview.attachment_data;link.download=preview.attachment_name||"file";link.click();}}>Download file</button></div>
+      {preview && <div className="classroom-preview-backdrop" role="presentation" onClick={() => setPreview(null)}><section className="classroom-preview" role="dialog" aria-modal="true" aria-label={`Preview ${preview.attachment_name}`} onClick={(event) => event.stopPropagation()}><header><div><strong>{preview.attachment_name}</strong><small>{previewMime}</small></div><button onClick={() => setPreview(null)} aria-label="Close preview">×</button></header><div className="classroom-preview__body">{preview.unsupported ? <div className="classroom-preview__unsupported"><span>▤</span><h3>Preview unavailable for this file type</h3><p>You can still download and open it with an app on your device.</p><button onClick={() => { try { downloadAttachment(preview.attachment_data, preview.attachment_name || "file"); } catch (error) { setStatus(error.message); } }}>Download file</button></div>
         : previewMime.startsWith("image/") ? <img src={preview.attachment_data} alt={preview.attachment_name} />
         : previewMime === "application/pdf" ? <iframe title={preview.attachment_name} src={preview.attachment_data} />
         : previewMime.startsWith("audio/") ? <audio controls src={preview.attachment_data} />

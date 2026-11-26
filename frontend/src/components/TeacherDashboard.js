@@ -1,4 +1,4 @@
-import { downloadReport } from '../utils/downloadReport';
+import { downloadReport, isAndroidApp } from '../utils/downloadReport';
 import React, { useState, useEffect } from "react";
 import { auth } from "../firebase";
 import { signOut } from "firebase/auth";
@@ -14,6 +14,8 @@ import {
   teacherMarkAttendanceManually, teacherUpdateSubjectSchedule
 } from "../utils/api";
 import "./TeacherDashboard.css";
+import { getAttendanceLocation } from "../utils/attendanceLocation";
+import MobileRoleNav from "./MobileRoleNav";
 import ChatHub from "./ChatHub";
 import ProjectHub from "./ProjectHub";
 import ProfileAvatar from "./ProfileAvatar";
@@ -92,6 +94,7 @@ const TeacherDashboard = ({ user }) => {
     try {
       const res = await teacherGetSubjectAttendance(subject.id, attendanceDate);
       setSubjectData(res.data);
+      setSessionOpen(Boolean(res.data.subject.active_session_id));
       setSchedule({ college_open_time: res.data.subject.college_open_time || "", college_close_time: res.data.subject.college_close_time || "", class_start_time: res.data.subject.class_start_time || "", class_end_time: res.data.subject.class_end_time || "", class_days: res.data.subject.class_days || "", current_topic: res.data.subject.current_topic || "", next_topic: res.data.subject.next_topic || "" });
     } catch { toast.error("Failed to load attendance data"); }
   };
@@ -105,22 +108,15 @@ const TeacherDashboard = ({ user }) => {
     }
     setSessionStarting(true);
     try {
-      if (!navigator.geolocation) throw new Error("Location is unavailable in this browser");
-      const location = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(
-        p => resolve({ latitude: p.coords.latitude, longitude: p.coords.longitude }),
-        reject, { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
-      ));
+      const location = await getAttendanceLocation(Math.min(radius, 75));
       await teacherStartSession(activeSubject.id, 10, radius, location);
       setSessionOpen(true);
       toast.success("10-minute attendance session started.");
       const res = await teacherGetSubjectAttendance(activeSubject.id, attendanceDate);
       setSubjectData(res.data);
     } catch (err) {
-      const message = err.response?.data?.message || (err.code === 1
-        ? "Allow location access in your browser to start an attendance session."
-        : err.code === 3
-          ? "Location is taking too long. Check the device signal and try again."
-          : err.message || "Could not start the attendance session.");
+      if (err.response?.status === 409 && err.response.data?.session_id) setSessionOpen(true);
+      const message = err.response?.data?.message || err.message || "Could not start the attendance session.";
       toast.error(message);
     } finally {
       setSessionStarting(false);
@@ -250,7 +246,7 @@ const TeacherDashboard = ({ user }) => {
   const getInitials = (name) => name ? name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) : "T";
 
   return (
-    <div className="td-root">
+    <div className={`td-root ${isAndroidApp ? "mobile-role-page" : ""}`}>
       {/* Sidebar */}
       <aside className={`td-sidebar ${sidebarOpen ? "open" : "collapsed"}`}>
         <div className="td-sidebar-header">
@@ -326,7 +322,7 @@ const TeacherDashboard = ({ user }) => {
               </span>
             )}
           </div>
-          <div className="td-topbar-right">
+          {isAndroidApp ? <button className="td-tab-pill" onClick={handleLogout}>Log out</button> : <div className="td-topbar-right">
             <button
               className={`td-tab-pill ${activeTab === "students" ? "active" : ""}`}
               onClick={() => setActiveTab("students")}
@@ -348,10 +344,25 @@ const TeacherDashboard = ({ user }) => {
               className={`td-tab-pill ${activeTab === "profile" ? "active" : ""}`}
               onClick={() => setActiveTab("profile")}
             >Profile</button>
-          </div>
+          </div>}
         </header>
 
+        {isAndroidApp && <MobileRoleNav role="teacher" active={activeTab} onChange={setActiveTab} />}
         <div className="td-content">
+          {isAndroidApp && activeTab === "attendance" && (
+            <div className="td-android-class">
+              <label>Class
+                <select value={activeSubject?.id || ""} onChange={event => {
+                  const subject = subjects.find(item => String(item.id) === event.target.value);
+                  if (subject) openSubject(subject);
+                }}>
+                  <option value="" disabled>{subjects.length ? "Select a subject" : "No assigned subjects"}</option>
+                  {subjects.map(subject => <option key={subject.id} value={subject.id}>{subject.name} · {subject.year}</option>)}
+                </select>
+              </label>
+              <button className="td-tab-pill" onClick={handleExport}>Export CSV</button>
+            </div>
+          )}
 
           {/* PROFILE TAB */}
           {activeTab === "profile" && (

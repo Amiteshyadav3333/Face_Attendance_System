@@ -12,6 +12,22 @@ if (isAndroidApp) {
 
 export { isAndroidApp };
 
+export function downloadAttachment(dataUrl, filename) {
+  if (isAndroidApp) {
+    const match = /^data:[^,]*;base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
+    if (!androidExportPort || !match || match[1].length > 7 * 1024 * 1024) {
+      throw new Error("Could not open the Android attachment saver.");
+    }
+    androidExportPort.postMessage(JSON.stringify({ filename, attachment: match[1] }));
+    return;
+  }
+
+  const link = document.createElement("a");
+  link.href = dataUrl;
+  link.download = filename;
+  link.click();
+}
+
 export async function downloadReport(data, filename) {
   const csv = new Blob([data], { type: 'text/csv' });
   if (isAndroidApp) {

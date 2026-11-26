@@ -18,20 +18,17 @@ android {
         applicationId 'com.faceattendance.mobile'
         minSdk 26
         targetSdk 36
-        versionCode 1
-        versionName '1.0'
+        versionCode 3
+        versionName '1.2'
+        buildConfigField 'String', 'ATTENDANCE_URL',
+                '"' + (configuredUrl ?: 'https://appassets.androidplatform.net/') + '"'
     }
 
     buildFeatures {
         buildConfig true
     }
 
-    buildTypes {
-        debug {
-            buildConfigField 'String', 'ATTENDANCE_URL', '"' + (configuredUrl ?: 'http://localhost:3000/') + '"'
-        }
-        release {
-            buildConfigField 'String', 'ATTENDANCE_URL', '"' + (configuredUrl ?: '') + '"'
-        }
+    sourceSets {
+        main.assets.srcDir layout.buildDirectory.dir('generated/attendanceWeb').get().asFile
     }
 }

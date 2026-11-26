@@ -8,6 +8,8 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
+import android.util.Base64;
+import android.webkit.MimeTypeMap;
 import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -26,14 +28,17 @@ import android.widget.Toast;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
 
 public final class MainActivity extends Activity {
-    private static final int CAMERA = 1;
+    private static final String BUNDLED_HOST = "appassets.androidplatform.net";
+    private static final int WEB_MEDIA = 1;
     private static final int PICK_IMAGE = 2;
     private static final int SAVE_CSV = 3;
     private static final int MAX_CSV_BYTES = 8 * 1024 * 1024;
@@ -43,14 +48,16 @@ public final class MainActivity extends Activity {
     private Uri frontend;
     private LinearLayout errorPanel;
     private TextView errorMessage;
-    private PermissionRequest cameraRequest;
+    private PermissionRequest mediaRequest;
     private ValueCallback<Uri[]> imagePicker;
     private WebMessagePort exportPort;
-    private String pendingCsv;
+    private byte[] pendingFile;
+    private AttendanceLocation attendanceLocation;
 
     @Override
     public void onCreate(Bundle state) {
         super.onCreate(state);
+        attendanceLocation = new AttendanceLocation(this);
         frontend = Uri.parse(BuildConfig.ATTENDANCE_URL);
         browser = new WebView(this);
         browser.getSettings().setJavaScriptEnabled(true);
@@ -61,6 +68,14 @@ public final class MainActivity extends Activity {
                 + " FaceAttendanceAndroid");
         browser.setWebViewClient(new WebViewClient() {
             @Override
+            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                if (BUNDLED_HOST.equals(frontend.getHost()) && sameOrigin(request.getUrl())) {
+                    return bundledResource(request);
+                }
+                return null;
+            }
+
+            @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 return request.isForMainFrame() && !sameOrigin(request.getUrl());
             }
@@ -69,6 +84,10 @@ public final class MainActivity extends Activity {
             public void onPageFinished(WebView view, String url) {
                 if (sameOrigin(Uri.parse(url)) && errorPanel.getVisibility() != View.VISIBLE) {
                     connectExport();
+                    WebMessagePort[] ports = browser.createWebMessageChannel();
+                    attendanceLocation.connect(ports[0]);
+                    Uri origin = Uri.parse(frontend.getScheme() + "://" + frontend.getEncodedAuthority());
+                    browser.postWebMessage(new WebMessage("face-attendance-device", new WebMessagePort[]{ports[1]}), origin);
                 }
             }
 
@@ -89,23 +108,29 @@ public final class MainActivity extends Activity {
         browser.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onPermissionRequest(PermissionRequest request) {
-                if (cameraRequest != null || !sameOrigin(request.getOrigin())
-                        || !Arrays.asList(request.getResources()).contains(PermissionRequest.RESOURCE_VIDEO_CAPTURE)) {
+                if (mediaRequest != null || !sameOrigin(request.getOrigin())) {
                     request.deny();
                     return;
                 }
-                if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-                    grantCamera(request);
-                    return;
+                List<String> missing = new ArrayList<>();
+                for (String resource : request.getResources()) {
+                    String permission = mediaPermission(resource);
+                    if (permission != null && checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED) {
+                        missing.add(permission);
+                    }
                 }
-                cameraRequest = request;
-                requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA);
+                if (missing.isEmpty()) {
+                    grantMedia(request);
+                } else {
+                    mediaRequest = request;
+                    requestPermissions(missing.toArray(new String[0]), WEB_MEDIA);
+                }
             }
 
             @Override
             public void onPermissionRequestCanceled(PermissionRequest request) {
-                if (cameraRequest == request) {
-                    cameraRequest = null;
+                if (mediaRequest == request) {
+                    mediaRequest = null;
                 }
             }
 
@@ -116,9 +141,7 @@ public final class MainActivity extends Activity {
                     return false;
                 }
                 imagePicker = callback;
-                Intent picker = new Intent(Intent.ACTION_OPEN_DOCUMENT)
-                        .addCategory(Intent.CATEGORY_OPENABLE)
-                        .setType("image/*");
+                Intent picker = params.createIntent();
                 try {
                     startActivityForResult(picker, PICK_IMAGE);
                 } catch (ActivityNotFoundException error) {
@@ -144,6 +167,35 @@ public final class MainActivity extends Activity {
         root.addView(browser, new LinearLayout.LayoutParams(-1, 0, 1));
         setContentView(root);
         openFrontend();
+    }
+
+    private WebResourceResponse bundledResource(WebResourceRequest request) {
+        Uri url = request.getUrl();
+        String path = url.getPath();
+        if (path == null || path.contains("..") || path.contains("\\")
+                || !"GET".equals(request.getMethod())) {
+            return bundledNotFound();
+        }
+        if (path.equals("/") || path.equals("/login") || path.equals("/dashboard")
+                || path.startsWith("/projects/share/")) {
+            path = "/index.html";
+        }
+
+        try {
+            InputStream data = getAssets().open("web" + path);
+            String extension = MimeTypeMap.getFileExtensionFromUrl(path);
+            String mimeType = extension.equals("js") ? "application/javascript"
+                    : MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension);
+            return new WebResourceResponse(mimeType == null ? "application/octet-stream" : mimeType,
+                    "UTF-8", data);
+        } catch (IOException error) {
+            return bundledNotFound();
+        }
+    }
+
+    private static WebResourceResponse bundledNotFound() {
+        return new WebResourceResponse("text/plain", "UTF-8", 404, "Not Found",
+                java.util.Collections.emptyMap(), null);
     }
 
     private void openFrontend() {
@@ -192,44 +244,81 @@ public final class MainActivity extends Activity {
     }
 
     private void receiveExport(String message) {
-        if (pendingCsv != null || message == null || message.length() > MAX_CSV_BYTES * 2) {
+        if (pendingFile != null || message == null || message.length() > MAX_CSV_BYTES * 2) {
             return;
         }
         try {
             JSONObject export = new JSONObject(message);
             String filename = export.getString("filename");
-            String contents = export.getString("contents");
-            if (!filename.matches("(my_)?attendance_[0-9]{4}-[0-9]{2}-[0-9]{2}\\.csv")
-                    || contents.getBytes(StandardCharsets.UTF_8).length > MAX_CSV_BYTES) {
-                toast("This attendance report could not be saved.");
+            boolean attachment = export.has("attachment");
+            String mime = "text/csv";
+            byte[] contents;
+            if (attachment) {
+                filename = filename.replaceAll("[\\p{Cntrl}/\\\\]", "_").trim();
+                if (filename.isEmpty() || filename.equals(".") || filename.equals("..")) filename = "attachment";
+                if (filename.length() > 180) filename = filename.substring(0, 180);
+                contents = Base64.decode(export.getString("attachment"), Base64.DEFAULT);
+                mime = "application/octet-stream";
+            } else {
+                if (!filename.matches("(my_)?attendance_[0-9]{4}-[0-9]{2}-[0-9]{2}\\.csv")) {
+                    toast("This attendance report could not be saved.");
+                    return;
+                }
+                contents = export.getString("contents").getBytes(StandardCharsets.UTF_8);
+            }
+            if (contents.length > MAX_CSV_BYTES) {
+                toast("This file is too large to save.");
                 return;
             }
-            pendingCsv = contents;
+            pendingFile = contents;
             startActivityForResult(new Intent(Intent.ACTION_CREATE_DOCUMENT)
                     .addCategory(Intent.CATEGORY_OPENABLE)
-                    .setType("text/csv")
+                    .setType(mime)
                     .putExtra(Intent.EXTRA_TITLE, filename), SAVE_CSV);
         } catch (Exception error) {
-            pendingCsv = null;
+            pendingFile = null;
             toast("Could not open the Android file picker.");
         }
     }
 
-    private void grantCamera(PermissionRequest request) {
-        request.grant(new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+    private static String mediaPermission(String resource) {
+        if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource)) return Manifest.permission.CAMERA;
+        if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource)) return Manifest.permission.RECORD_AUDIO;
+        return null;
+    }
+
+    private void grantMedia(PermissionRequest request) {
+        List<String> granted = new ArrayList<>();
+        for (String resource : request.getResources()) {
+            String permission = mediaPermission(resource);
+            if (permission != null && checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED) {
+                granted.add(resource);
+            }
+        }
+        if (granted.isEmpty()) request.deny();
+        else request.grant(granted.toArray(new String[0]));
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        attendanceLocation.onResume();
+    }
+
+    @Override
+    protected void onPause() {
+        attendanceLocation.onPause();
+        super.onPause();
     }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(requestCode, permissions, results);
-        if (requestCode == CAMERA && cameraRequest != null) {
-            if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
-                grantCamera(cameraRequest);
-            } else {
-                cameraRequest.deny();
-            }
-            cameraRequest = null;
+        if (requestCode == WEB_MEDIA && mediaRequest != null) {
+            grantMedia(mediaRequest);
+            mediaRequest = null;
         }
+        if (requestCode == AttendanceLocation.PERMISSION_REQUEST) attendanceLocation.onPermissionResult();
     }
 
     @Override
@@ -240,26 +329,26 @@ public final class MainActivity extends Activity {
             imagePicker = null;
         }
         if (requestCode == SAVE_CSV) {
-            String contents = pendingCsv;
-            pendingCsv = null;
+            byte[] contents = pendingFile;
+            pendingFile = null;
             if (contents != null && resultCode == RESULT_OK && data != null && data.getData() != null) {
                 Uri destination = data.getData();
-                fileWriter.execute(() -> writeCsv(destination, contents));
+                fileWriter.execute(() -> writeFile(destination, contents));
             }
         }
     }
 
-    private void writeCsv(Uri destination, String contents) {
+    private void writeFile(Uri destination, byte[] contents) {
         try (OutputStream output = getContentResolver().openOutputStream(destination)) {
             if (output == null) {
                 throw new IOException("Destination is unavailable");
             }
-            output.write(contents.getBytes(StandardCharsets.UTF_8));
+            output.write(contents);
         } catch (IOException | SecurityException error) {
-            runOnUiThread(() -> toast("Could not save the attendance report."));
+            runOnUiThread(() -> toast("Could not save the file."));
             return;
         }
-        runOnUiThread(() -> toast("Attendance report saved."));
+        runOnUiThread(() -> toast("File saved."));
     }
 
     private void toast(String message) {
@@ -277,8 +366,8 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
-        if (cameraRequest != null) {
-            cameraRequest.deny();
+        if (mediaRequest != null) {
+            mediaRequest.deny();
         }
         if (imagePicker != null) {
             imagePicker.onReceiveValue(null);
@@ -286,6 +375,7 @@ public final class MainActivity extends Activity {
         if (exportPort != null) {
             exportPort.close();
         }
+        attendanceLocation.closePort();
         fileWriter.shutdown();
         browser.destroy();
         super.onDestroy();

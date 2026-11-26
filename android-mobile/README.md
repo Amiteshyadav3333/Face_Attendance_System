@@ -1,26 +1,30 @@
 # Face Attendance for Android
 
-Open this directory in Android Studio with JDK 17 or later, Android SDK 36 and Gradle 9.4.1. The Android app runs the project's React dashboards in a WebView and uses the existing Firebase email/password login and Flask API. Android provides the camera permission, enrollment photo picker and CSV save dialog. The Flask server still verifies the student's live face challenge.
+The Android app bundles the React frontend and connects to the Flask API over
+HTTPS. It uses Firebase email/password login and Android's camera, photo picker
+and CSV save dialog. The backend verifies the student's live face challenge.
 
-## Run with the Mac development servers
+## Build the bundled APK
 
-Start the configured Flask backend on port 5001 from `frontend/src/backend` with your virtual environment active. Start the React frontend from `frontend` with `npm start` on port 3000. Keep `REACT_APP_BACKEND_URL=http://localhost:5001` in the frontend development environment.
-
-Connect an emulator or USB-debugging device. With the Android SDK's platform tools available, run:
+Use JDK 17 or later, Android SDK 36, Node.js, and the project's Firebase web
+settings in `frontend/.env`. Install the React dependencies with `npm ci` in
+`frontend`, then run the following from this directory:
 
 ```sh
-adb reverse tcp:3000 tcp:3000
-adb reverse tcp:5001 tcp:5001
+./build-bundled-debug.sh
 ```
 
-Build and run the debug variant. The Android app opens `http://localhost:3000/`, and both connections travel through the device's ADB connection. Use a registered Firebase email/password account. The emulator requires a configured camera to run a real liveness check.
+The script builds the frontend into Gradle's generated assets directory and
+produces `app/build/outputs/apk/debug/app-debug.apk`. It uses the Render API
+by default. Override it with `REACT_APP_BACKEND_URL` to target a different
+HTTPS API. The APK requires internet access to reach the backend and Firebase.
 
-## Connect to an HTTPS deployment
+## Use a hosted frontend
 
-Build and deploy the updated frontend with `REACT_APP_BACKEND_URL` set to your HTTPS API. Configure your host to serve the React entry point for client routes such as `/login` and `/dashboard`. Use the frontend URL when building:
+To load an existing HTTPS frontend instead of bundling it, configure the
+frontend with your HTTPS API URL and serve the React entry point for client
+routes such as `/login` and `/dashboard`. Build with:
 
 ```sh
 ./gradlew assembleDebug -PattendanceUrl=https://attendance.example.edu/
 ```
-
-Build a signed release in Android Studio with the same Gradle property. The Android sign-in screen uses Firebase email/password. Google popup sign-in remains available in the regular browser.
