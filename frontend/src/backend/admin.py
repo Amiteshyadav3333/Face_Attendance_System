@@ -192,12 +192,15 @@ def get_teachers():
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     cursor.execute("""
-        SELECT t.*, u.email,
-               GROUP_CONCAT(sub.name SEPARATOR ', ') as subjects
+        SELECT t.*, u.email, assigned.subjects
         FROM teachers t
         LEFT JOIN users u ON t.user_id = u.id
-        LEFT JOIN subjects sub ON sub.teacher_id = t.id
-        GROUP BY t.id
+        LEFT JOIN (
+            SELECT teacher_id, GROUP_CONCAT(name ORDER BY name SEPARATOR ', ') AS subjects
+            FROM subjects
+            GROUP BY teacher_id
+        ) assigned ON assigned.teacher_id = t.id
+        ORDER BY t.name, t.id
     """)
     teachers = cursor.fetchall()
     conn.close()

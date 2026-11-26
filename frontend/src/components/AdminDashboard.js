@@ -23,6 +23,7 @@ const AdminDashboard = ({ user }) => {
   const [activeTab, setActiveTab] = useState("Users");
   const [users, setUsers] = useState([]);
   const [teachers, setTeachers] = useState([]);
+  const [teachersStatus, setTeachersStatus] = useState("loading");
   const [students, setStudents] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [attendance, setAttendance] = useState([]);
@@ -35,13 +36,30 @@ const AdminDashboard = ({ user }) => {
 
   useEffect(() => { fetchTab(activeTab); }, [activeTab]);
 
+  const fetchTeachers = async () => {
+    setTeachersStatus("loading");
+    try {
+      const { data } = await adminGetTeachers();
+      setTeachers(data.teachers);
+      setTeachersStatus("ready");
+    } catch {
+      setTeachersStatus("error");
+    }
+  };
+
+  const teacherPlaceholder = {
+    loading: "Loading teachers…",
+    error: "Could not load teachers",
+    ready: teachers.length ? "Select Teacher" : "No teachers available"
+  }[teachersStatus];
+
   const fetchTab = (tab) => {
     if (tab === "Users") adminGetUsers().then(r => setUsers(r.data.users)).catch(() => {});
-    if (tab === "Teachers") adminGetTeachers().then(r => setTeachers(r.data.teachers)).catch(() => {});
+    if (tab === "Teachers") fetchTeachers();
     if (tab === "Students") adminGetStudents().then(r => setStudents(r.data.students)).catch(() => {});
     if (tab === "Subjects") {
       adminGetSubjects().then(r => setSubjects(r.data.subjects)).catch(() => {});
-      adminGetTeachers().then(r => setTeachers(r.data.teachers)).catch(() => {});
+      fetchTeachers();
     }
     if (tab === "Attendance") adminGetAttendance().then(r => setAttendance(r.data.attendance)).catch(() => {});
   };
@@ -57,6 +75,7 @@ const AdminDashboard = ({ user }) => {
     try {
       await adminCreateUser(newUser);
       toast.success("User created!");
+      if (newUser.role === "teacher") fetchTeachers();
       setNewUser({ email: "", password: "", role: "teacher", name: "", department: "", roll_number: "", year: "1st" });
       fetchTab("Users");
     } catch (err) {
@@ -344,13 +363,17 @@ const AdminDashboard = ({ user }) => {
             <h2>Create Subject</h2>
             <form onSubmit={handleCreateSubject} className="form-grid">
               <input placeholder="Subject Name" value={newSubject.name} onChange={e => setNewSubject({ ...newSubject, name: e.target.value })} required />
-              <select value={newSubject.teacher_id} onChange={e => setNewSubject({ ...newSubject, teacher_id: e.target.value })} required>
-                <option value="">Select Teacher</option>
+              <select value={newSubject.teacher_id} onChange={e => setNewSubject({ ...newSubject, teacher_id: e.target.value })} disabled={teachersStatus !== "ready" || teachers.length === 0} required>
+                <option value="">{teacherPlaceholder}</option>
                 {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
               <input maxLength={50} placeholder="Year / semester / batch" value={newSubject.year} onChange={e => setNewSubject({ ...newSubject, year: e.target.value })} required />
-              <button type="submit" className="btn-primary">Create Subject</button>
+              <button type="submit" className="btn-primary" disabled={teachersStatus !== "ready" || !newSubject.teacher_id}>Create Subject</button>
             </form>
+
+            {teachersStatus === "error" && (
+              <button type="button" className="btn-secondary" onClick={fetchTeachers}>Retry loading teachers</button>
+            )}
 
             <h2>All Subjects</h2>
             <table className="data-table">
